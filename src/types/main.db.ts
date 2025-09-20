@@ -22,7 +22,7 @@ export interface ITab {
   session_id: string;
   url: string;
   title?: string;
-  content?: string; // raw HTML or extracted text
+  content?: string; 
   created_at: Date;
 }
 
