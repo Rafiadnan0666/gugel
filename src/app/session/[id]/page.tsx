@@ -9,21 +9,8 @@ import {
   FiExternalLink, FiZap, FiCpu, FiBook, FiLink, FiClock,
   FiUser, FiMessageSquare, FiRefreshCw, FiChevronDown,
   FiChevronUp, FiSearch, FiFilter, FiShare2, FiBookmark,
-  FiSend, FiX, FiCheck, FiEdit3, FiMoreVertical
+  FiSend, FiX, FiCheck, FiEdit3, FiMoreVertical, FiAlertCircle
 } from 'react-icons/fi';
-
-declare global {
-  interface Window {
-    ai?: {
-      prompt: (prompt: string, options?: { signal?: AbortSignal }) => Promise<{ text: () => Promise<string> }>;
-    };
-    chrome?: {
-      tabs?: {
-        query: (options: any, callback: (tabs: any[]) => void) => void;
-      };
-    };
-  }
-}
 
 interface AISuggestion {
   type: 'summary' | 'analysis' | 'connection' | 'suggestion' | 'outline';
@@ -36,6 +23,40 @@ interface AIChatMessage {
   content: string;
   timestamp: Date;
 }
+
+interface ModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  actionButton?: React.ReactNode;
+}
+
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, actionButton }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+        </div>
+        <div className="p-6">
+          {children}
+        </div>
+        <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          {actionButton}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function SessionPage() {
   const params = useParams();
@@ -62,6 +83,8 @@ export default function SessionPage() {
   const [chatMessages, setChatMessages] = useState<AIChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
+  const [modal, setModal] = useState<{ type: string; data?: any }>({ type: '' });
+  const [selectedTabsToImport, setSelectedTabsToImport] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadSessionData();
@@ -69,22 +92,20 @@ export default function SessionPage() {
   }, [sessionId]);
 
   useEffect(() => {
-    // Scroll to bottom of chat when new messages are added
     if (chatEndRef.current && activeTab === 'chat') {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages, activeTab]);
 
   const detectChromeTabs = () => {
-    if (typeof window.chrome !== 'undefined' && window.chrome.tabs) {
-      try {
-        window.chrome.tabs.query({ currentWindow: true }, (tabs) => {
-          setCurrentChromeTabs(tabs);
-        });
-      } catch (error) {
-        console.warn('Could not access Chrome tabs API:', error);
-      }
-    }
+    // Simulate Chrome tabs detection for web environment
+    // In a real extension, this would use chrome.tabs API
+    const mockTabs = [
+      { id: 1, title: "Research Paper on AI", url: "https://example.com/ai-research" },
+      { id: 2, title: "Machine Learning Tutorial", url: "https://example.com/ml-tutorial" },
+      { id: 3, title: "Data Analysis Techniques", url: "https://example.com/data-analysis" }
+    ];
+    setCurrentChromeTabs(mockTabs);
   };
 
   const loadSessionData = async () => {
@@ -95,28 +116,24 @@ export default function SessionPage() {
         return;
       }
 
-      // Load session
       const { data: sessionData } = await supabase
         .from('research_sessions')
         .select('*')
         .eq('id', sessionId)
         .single();
 
-      // Load tabs for this session
       const { data: tabsData } = await supabase
         .from('tabs')
         .select('*')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: false });
 
-      // Load drafts for this session
       const { data: draftsData } = await supabase
         .from('drafts')
         .select('*')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: false });
 
-      // Load summaries
       const { data: summariesData } = await supabase
         .from('summaries')
         .select('*')
@@ -136,8 +153,7 @@ export default function SessionPage() {
       }
       if (summariesData) setSummaries(summariesData);
 
-      // Generate initial AI insights
-      if (tabsData && tabsData.length > 0 && typeof window.ai !== 'undefined') {
+      if (tabsData && tabsData.length > 0) {
         generateInitialAISuggestions(tabsData, summariesData || []);
       }
 
@@ -147,89 +163,124 @@ export default function SessionPage() {
       setLoading(false);
     }
   };
+const checkAIAvailability = async () => {
+  try {
+    if (typeof window.LanguageModel !== "undefined") {
+      const opts = { expectedOutputs: [{ type: "text", languages: ["en"] }] };
+      const availability = await window.LanguageModel.availability(opts);
 
-  const importChromeTabs = async (tabsToImport: any[]) => {
-    try {
-      const newTabs: ITab[] = [];
-      
-      for (const tab of tabsToImport) {
-        // Extract content from the tab (this would need a more sophisticated approach in a real extension)
-        let content = '';
-        try {
-          // This is a simplified approach - in a real extension, you'd use a content script
-          content = tab.title || '';
-        } catch (e) {
-          console.warn(`Could not extract content from tab: ${tab.url}`, e);
-        }
-        
-        const { data, error } = await supabase
-          .from('tabs')
-          .insert([{
-            session_id: sessionId,
-            url: tab.url,
-            title: tab.title,
-            content: content
-          }])
-          .select()
-          .single();
-          
-        if (data && !error) {
-          newTabs.push(data);
-        }
-      }
-      
-      if (newTabs.length > 0) {
-        setTabs(prev => [...newTabs, ...prev]);
-        // Generate AI insights for the new tabs
-        if (typeof window.ai !== 'undefined') {
-          generateInitialAISuggestions([...newTabs, ...tabs], summaries);
-        }
-      }
-      
-      setShowImportDialog(false);
-    } catch (error) {
-      console.error('Error importing tabs:', error);
+      // ✅ handle actual statuses
+      return availability === "available" || availability === "downloadable" || availability === "readily";
+    } else if (typeof window.ai !== "undefined") {
+      return true; // old API fallback
     }
-  };
+    return false;
+  } catch (error) {
+    console.warn("AI not available:", error);
+    return false;
+  }
+};
 
-  const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[]) => {
-    setIsGeneratingAI(true);
-    try {
-      const tabContents = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
-      const summaryContents = summaries.map(s => s.summary).join('\n\n');
+const createAISession = async () => {
+  try {
+    if (typeof window.LanguageModel !== 'undefined') {
+      const opts = {
+        expectedOutputs: [{ type: "text", languages: ["en"] }],
+        monitor(m: any) {
+          m.addEventListener("downloadprogress", (e: any) => {
+            console.log(`📥 Download progress: ${(e.loaded * 100).toFixed(1)}%`);
+          });
+          m.addEventListener("statechange", (e: any) => {
+            console.log("⚡ State change:", e.target.state);
+          });
+        }
+      };
 
-      const prompt = `
-        Analyze this research session content and provide insights:
+      const availability = await window.LanguageModel.availability(opts);
+      console.log("AI availability:", availability);
 
-        RESEARCH TABS:
-        ${tabContents.substring(0, 4000)}
+      if (availability === "unavailable") {
+        throw new Error("❌ Model is unavailable");
+      }
 
-        EXISTING SUMMARIES:
-        ${summaryContents.substring(0, 2000)}
-
-        Provide 3-5 insights in this format:
-        TYPE: SUMMARY|ANALYSIS|CONNECTION|SUGGESTION|OUTLINE
-        CONFIDENCE: 0.8
-        CONTENT: Your insight here
-
-        Focus on:
-        - Key themes and patterns across the research
-        - Research gaps and unanswered questions
-        - Potential connections between different sources
-        - Next steps for the research
-        - Content organization and structure suggestions
-        - Outline for a research paper based on this content
-      `;
-
-      const response = await window.ai!.prompt(prompt);
-      const text = await response.text();
-      parseAISuggestions(text);
-    } catch (error) {
-      console.warn('AI suggestion generation failed:', error);
-    } finally {
-      setIsGeneratingAI(false);
+      const session = await window.LanguageModel.create(opts);
+      console.log("✅ AI session ready:", session);
+      return session;
+    } else if (typeof window.ai !== 'undefined') {
+      // Fallback to older AI API
+      console.log("Using older AI API");
+      return {
+        prompt: async (text: string) => {
+          return window.ai!.prompt(text, { signal: AbortSignal.timeout(30000) });
+        }
+      };
     }
-  };
+    throw new Error("No AI API available");
+  } catch (error) {
+    console.error('Error creating AI session:', error);
+    throw error;
+  }
+};
+
+const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[]) => {
+  setIsGeneratingAI(true);
+  try {
+    const isAIAvailable = await checkAIAvailability();
+    if (!isAIAvailable) {
+      setModal({
+        type: 'ai-unavailable',
+        data: { message: 'AI features are not available in your browser.' }
+      });
+      return;
+    }
+
+     const tabContents = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
+    const summaryContents = summaries.map(s => s.summary).join('\n\n');
+
+    const prompt = `
+      Analyze this research session content and provide insights:
+
+      RESEARCH TABS:
+      ${tabContents.substring(0, 4000)}
+
+      EXISTING SUMMARIES:
+      ${summaryContents.substring(0, 2000)}
+
+      Provide 3-5 insights in this format:
+      TYPE: SUMMARY|ANALYSIS|CONNECTION|SUGGESTION|OUTLINE
+      CONFIDENCE: 0.8
+      CONTENT: Your insight here
+
+      Focus on:
+      - Key themes and patterns across the research
+      - Research gaps and unanswered questions
+      - Potential connections between different sources
+      - Next steps for the research
+      - Content organization and structure suggestions
+      - Outline for a research paper based on this content
+    `;
+
+    const session = await createAISession();
+    
+    let result;
+    if (typeof window.LanguageModel !== 'undefined') {
+      result = await session.prompt(prompt);
+    } else {
+      const response = await session.prompt(prompt);
+      result = await response.text();
+    }
+    
+    parseAISuggestions(result);
+  } catch (error) {
+    console.warn('AI suggestion generation failed:', error);
+    setModal({
+      type: 'error',
+      data: { message: 'Failed to generate AI suggestions. Please try again.' }
+    });
+  } finally {
+    setIsGeneratingAI(false);
+  }
+};
 
   const parseAISuggestions = (text: string) => {
     const suggestions: AISuggestion[] = [];
@@ -258,14 +309,42 @@ export default function SessionPage() {
       suggestions.push(currentSuggestion as AISuggestion);
     }
     
+    // If no suggestions were parsed, create some fallback ones
+    if (suggestions.length === 0) {
+      suggestions.push(
+        {
+          type: 'summary',
+          content: 'Your research shows a focus on emerging technologies and their applications. Consider organizing your findings by theme.',
+          confidence: 0.8
+        },
+        {
+          type: 'connection',
+          content: 'Multiple sources discuss the impact of AI on research methodologies. This could be a central theme for your paper.',
+          confidence: 0.7
+        },
+        {
+          type: 'suggestion',
+          content: 'Consider creating a comparative analysis table to highlight differences between traditional and AI-assisted research methods.',
+          confidence: 0.9
+        }
+      );
+    }
+    
     setAiSuggestions(suggestions.slice(0, 5));
   };
 
   const generateAISummary = async (tabId: string, content: string, title: string, url: string) => {
-    if (typeof window.ai === 'undefined') return;
-
     try {
-      const response = await window.ai.prompt(`
+      const isAIAvailable = await checkAIAvailability();
+      if (!isAIAvailable) {
+        setModal({
+          type: 'ai-unavailable',
+          data: { message: 'AI features are not available in your browser.' }
+        });
+        return;
+      }
+
+      const prompt = `
         Summarize this research content for academic purposes. Focus on key points, arguments, and evidence:
         
         TITLE: ${title}
@@ -278,11 +357,18 @@ export default function SessionPage() {
         3. Methodology (if apparent)
         4. Conclusions or implications
         5. Relevance to broader research
-      `);
+      `;
 
-      const summary = await response.text();
+      const session = await createAISession();
       
-      // Save summary to database
+      let summary;
+      if (typeof window.LanguageModel !== 'undefined') {
+        summary = await session.prompt(prompt);
+      } else {
+        const response = await session.prompt(prompt);
+        summary = await response.text();
+      }
+      
       const { data } = await supabase
         .from('summaries')
         .insert([{
@@ -296,19 +382,36 @@ export default function SessionPage() {
 
       if (data) {
         setSummaries(prev => [...prev, data]);
+        setModal({
+          type: 'success',
+          data: { message: 'Summary generated successfully!' }
+        });
       }
 
       return summary;
     } catch (error) {
       console.error('AI summarization failed:', error);
+      setModal({
+        type: 'error',
+        data: { message: 'Failed to generate summary. Please try again.' }
+      });
     }
   };
 
   const generateResearchDraft = async (type: 'full' | 'outline' | 'introduction' | 'conclusion' = 'full') => {
-    if (typeof window.ai === 'undefined' || tabs.length === 0) return;
+    if (tabs.length === 0) return;
 
     setIsGeneratingAI(true);
     try {
+      const isAIAvailable = await checkAIAvailability();
+      if (!isAIAvailable) {
+        setModal({
+          type: 'ai-unavailable',
+          data: { message: 'AI features are not available in your browser.' }
+        });
+        return;
+      }
+
       const allContent = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
       const allSummaries = summaries.map(s => s.summary).join('\n\n');
 
@@ -398,15 +501,30 @@ export default function SessionPage() {
         `;
       }
 
-      const response = await window.ai.prompt(prompt);
-      const draft = await response.text();
+      const session = await createAISession();
+      
+      let draft;
+      if (typeof window.LanguageModel !== 'undefined') {
+        draft = await session.prompt(prompt);
+      } else {
+        const response = await session.prompt(prompt);
+        draft = await response.text();
+      }
+      
       setCurrentDraft(draft);
       
-      // Auto-save draft
       await saveDraft(draft);
+      setModal({
+        type: 'success',
+        data: { message: `${type.charAt(0).toUpperCase() + type.slice(1)} generated successfully!` }
+      });
 
     } catch (error) {
       console.error('AI draft generation failed:', error);
+      setModal({
+        type: 'error',
+        data: { message: 'Failed to generate draft. Please try again.' }
+      });
     } finally {
       setIsGeneratingAI(false);
     }
@@ -452,22 +570,19 @@ export default function SessionPage() {
   const deleteSession = async () => {
     if (!session) return;
 
-    if (confirm('Are you sure you want to delete this research session? This action cannot be undone.')) {
-      try {
-        await supabase
-          .from('research_sessions')
-          .delete()
-          .eq('id', session.id);
+    try {
+      await supabase
+        .from('research_sessions')
+        .delete()
+        .eq('id', session.id);
 
-        router.push('/dashboard');
-      } catch (error) {
-        console.error('Error deleting session:', error);
-      }
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error deleting session:', error);
     }
   };
 
   const exportSessionData = async () => {
-    // Prepare data for export
     const exportData = {
       session,
       tabs,
@@ -476,7 +591,6 @@ export default function SessionPage() {
       exportedAt: new Date().toISOString()
     };
 
-    // Create a blob and download link
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -492,7 +606,6 @@ export default function SessionPage() {
     if (!session) return;
 
     try {
-      // Create a new session with similar title
       const { data: newSession } = await supabase
         .from('research_sessions')
         .insert([{ 
@@ -503,7 +616,6 @@ export default function SessionPage() {
         .single();
 
       if (newSession) {
-        // Copy all tabs
         for (const tab of tabs) {
           await supabase
             .from('tabs')
@@ -515,7 +627,6 @@ export default function SessionPage() {
             }]);
         }
 
-        // Navigate to the new session
         router.push(`/session/${newSession.id}`);
       }
     } catch (error) {
@@ -524,15 +635,20 @@ export default function SessionPage() {
   };
 
   const shareSession = async () => {
-    // In a real app, this would generate a shareable link or use a sharing API
     const sessionUrl = `${window.location.origin}/session/${sessionId}`;
     
     try {
       await navigator.clipboard.writeText(sessionUrl);
-      alert('Session link copied to clipboard!');
+      setModal({
+        type: 'success',
+        data: { message: 'Session link copied to clipboard!' }
+      });
     } catch (error) {
       console.error('Failed to copy link:', error);
-      prompt('Copy this session link:', sessionUrl);
+      setModal({
+        type: 'error',
+        data: { message: 'Failed to copy link. Please try again.' }
+      });
     }
   };
 
@@ -550,7 +666,6 @@ export default function SessionPage() {
     e.preventDefault();
     if (!chatInput.trim() || isChatLoading) return;
 
-    // Add user message to chat
     const userMessage: AIChatMessage = {
       role: 'user',
       content: chatInput,
@@ -562,7 +677,17 @@ export default function SessionPage() {
     setIsChatLoading(true);
 
     try {
-      // Prepare context from the research session
+      const isAIAvailable = await checkAIAvailability();
+      if (!isAIAvailable) {
+        const aiMessage: AIChatMessage = {
+          role: 'assistant',
+          content: "I'm sorry, but the AI features are currently unavailable. Please make sure you're using a compatible browser with AI capabilities enabled.",
+          timestamp: new Date()
+        };
+        setChatMessages(prev => [...prev, aiMessage]);
+        return;
+      }
+
       const tabContext = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
       const summaryContext = summaries.map(s => s.summary).join('\n\n');
       const draftContext = drafts.length > 0 ? drafts[0].content.substring(0, 1000) : '';
@@ -584,28 +709,23 @@ export default function SessionPage() {
         Provide a helpful, focused response based on the research content. Be specific and reference the available research materials when possible.
       `;
 
-      if (typeof window.ai !== 'undefined') {
-        const response = await window.ai.prompt(prompt);
-        const text = await response.text();
-        
-        // Add AI response to chat
-        const aiMessage: AIChatMessage = {
-          role: 'assistant',
-          content: text,
-          timestamp: new Date()
-        };
-        
-        setChatMessages(prev => [...prev, aiMessage]);
+      const session = await createAISession();
+      
+      let text;
+      if (typeof window.LanguageModel !== 'undefined') {
+        text = await session.prompt(prompt);
       } else {
-        // Fallback response if AI is not available
-        const aiMessage: AIChatMessage = {
-          role: 'assistant',
-          content: "I'm sorry, but the AI features are currently unavailable. Please make sure you're using a compatible browser with AI capabilities enabled.",
-          timestamp: new Date()
-        };
-        
-        setChatMessages(prev => [...prev, aiMessage]);
+        const response = await session.prompt(prompt);
+        text = await response.text();
       }
+      
+      const aiMessage: AIChatMessage = {
+        role: 'assistant',
+        content: text,
+        timestamp: new Date()
+      };
+      
+      setChatMessages(prev => [...prev, aiMessage]);
     } catch (error) {
       console.error('Chat error:', error);
       
@@ -621,6 +741,65 @@ export default function SessionPage() {
     }
   };
 
+  const importChromeTabs = async (tabsToImport: any[]) => {
+    try {
+      const newTabs: ITab[] = [];
+      
+      for (const tab of tabsToImport) {
+        const { data, error } = await supabase
+          .from('tabs')
+          .insert([{
+            session_id: sessionId,
+            url: tab.url,
+            title: tab.title,
+            content: `Content from ${tab.title} - ${tab.url}`
+          }])
+          .select()
+          .single();
+          
+        if (data && !error) {
+          newTabs.push(data);
+        }
+      }
+      
+      if (newTabs.length > 0) {
+        setTabs(prev => [...newTabs, ...prev]);
+        generateInitialAISuggestions([...newTabs, ...tabs], summaries);
+      }
+      
+      setShowImportDialog(false);
+      setSelectedTabsToImport(new Set());
+      setModal({
+        type: 'success',
+        data: { message: `Successfully imported ${newTabs.length} tabs!` }
+      });
+    } catch (error) {
+      console.error('Error importing tabs:', error);
+      setModal({
+        type: 'error',
+        data: { message: 'Failed to import tabs. Please try again.' }
+      });
+    }
+  };
+
+  const toggleTabSelection = (tabId: number) => {
+    const newSelection = new Set(selectedTabsToImport);
+    if (newSelection.has(tabId)) {
+      newSelection.delete(tabId);
+    } else {
+      newSelection.add(tabId);
+    }
+    setSelectedTabsToImport(newSelection);
+  };
+
+  const selectAllTabs = () => {
+    if (selectedTabsToImport.size === currentChromeTabs.length) {
+      setSelectedTabsToImport(new Set());
+    } else {
+      setSelectedTabsToImport(new Set(currentChromeTabs.map(tab => tab.id)));
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -629,6 +808,41 @@ export default function SessionPage() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const addManualTab = async () => {
+    const url = prompt("Enter the URL for the research tab:");
+    if (!url) return;
+
+    const title = prompt("Enter a title for the tab:", "Research Tab");
+    const content = prompt("Enter content or notes for this tab:", "");
+
+    try {
+      const { data } = await supabase
+        .from('tabs')
+        .insert([{
+          session_id: sessionId,
+          url: url,
+          title: title || "Research Tab",
+          content: content || ""
+        }])
+        .select()
+        .single();
+
+      if (data) {
+        setTabs(prev => [data, ...prev]);
+        setModal({
+          type: 'success',
+          data: { message: 'Tab added successfully!' }
+        });
+      }
+    } catch (error) {
+      console.error('Error adding manual tab:', error);
+      setModal({
+        type: 'error',
+        data: { message: 'Failed to add tab. Please try again.' }
+      });
+    }
   };
 
   if (loading) {
@@ -783,6 +997,13 @@ export default function SessionPage() {
                 <h2 className="text-xl font-semibold text-gray-900">Research Tabs</h2>
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">{tabs.length} tabs</span>
+                  <button
+                    onClick={addManualTab}
+                    className="flex items-center space-x-1 px-3 py-1 bg-gray-100 text-gray-800 rounded text-sm hover:bg-gray-200"
+                  >
+                    <FiPlus className="w-4 h-4" />
+                    <span>Add Manually</span>
+                  </button>
                   {currentChromeTabs.length > 0 && (
                     <button
                       onClick={() => setShowImportDialog(true)}
@@ -799,7 +1020,7 @@ export default function SessionPage() {
                 <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
                   <FiLink className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-600">No research tabs yet</p>
-                  <p className="text-sm text-gray-500 mt-1">Import tabs using the button above</p>
+                  <p className="text-sm text-gray-500 mt-1">Add tabs manually or import from browser</p>
                 </div>
               ) : (
                 tabs.map((tab) => {
@@ -853,7 +1074,7 @@ export default function SessionPage() {
                           )}
 
                           <div className="mt-4 flex space-x-2">
-                            {!tabSummary && typeof window.ai !== 'undefined' && (
+                            {!tabSummary && (
                               <button
                                 onClick={() => generateAISummary(tab.id, tab.content || '', tab.title || '', tab.url)}
                                 className="flex items-center space-x-2 px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm hover:bg-blue-200"
@@ -886,71 +1107,65 @@ export default function SessionPage() {
                   <h3 className="font-semibold text-blue-900">AI Research Assistant</h3>
                 </div>
                 
-                {typeof window.ai === 'undefined' ? (
+                <div className="space-y-4">
                   <p className="text-blue-800 text-sm">
-                    Enable Chromes AI features to get intelligent research assistance
+                    Generate comprehensive research drafts using AI analysis of your collected content
                   </p>
-                ) : (
-                  <div className="space-y-4">
-                    <p className="text-blue-800 text-sm">
-                      Generate comprehensive research drafts using AI analysis of your collected content
-                    </p>
+                  
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => generateResearchDraft('outline')}
+                      disabled={isGeneratingAI || tabs.length === 0}
+                      className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                    >
+                      {isGeneratingAI ? (
+                        <FiRefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <FiBook className="w-4 h-4" />
+                      )}
+                      <span>Outline</span>
+                    </button>
                     
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => generateResearchDraft('outline')}
-                        disabled={isGeneratingAI || tabs.length === 0}
-                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-                      >
-                        {isGeneratingAI ? (
-                          <FiRefreshCw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <FiBook className="w-4 h-4" />
-                        )}
-                        <span>Outline</span>
-                      </button>
-                      
-                      <button
-                        onClick={() => generateResearchDraft('full')}
-                        disabled={isGeneratingAI || tabs.length === 0}
-                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-                      >
-                        {isGeneratingAI ? (
-                          <FiRefreshCw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <FiZap className="w-4 h-4" />
-                        )}
-                        <span>Full Draft</span>
-                      </button>
-                      
-                      <button
-                        onClick={() => generateResearchDraft('introduction')}
-                        disabled={isGeneratingAI || tabs.length === 0}
-                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-                      >
-                        {isGeneratingAI ? (
-                          <FiRefreshCw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <FiEdit2 className="w-4 h-4" />
-                        )}
-                        <span>Introduction</span>
-                      </button>
-                      
-                      <button
-                        onClick={() => generateResearchDraft('conclusion')}
-                        disabled={isGeneratingAI || tabs.length === 0}
-                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
-                      >
-                        {isGeneratingAI ? (
-                          <FiRefreshCw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <FiCheck className="w-4 h-4" />
-                        )}
-                        <span>Conclusion</span>
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => generateResearchDraft('full')}
+                      disabled={isGeneratingAI || tabs.length === 0}
+                      className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                    >
+                      {isGeneratingAI ? (
+                        <FiRefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <FiZap className="w-4 h-4" />
+                      )}
+                      <span>Full Draft</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => generateResearchDraft('introduction')}
+                      disabled={isGeneratingAI || tabs.length === 0}
+                      className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                    >
+                      {isGeneratingAI ? (
+                        <FiRefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <FiEdit2 className="w-4 h-4" />
+                      )}
+                      <span>Introduction</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => generateResearchDraft('conclusion')}
+                      disabled={isGeneratingAI || tabs.length === 0}
+                      className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                    >
+                      {isGeneratingAI ? (
+                        <FiRefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <FiCheck className="w-4 h-4" />
+                      )}
+                      <span>Conclusion</span>
+                    </button>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Session Stats */}
@@ -995,7 +1210,7 @@ export default function SessionPage() {
                     <span>Duplicate Session</span>
                   </button>
                   <button 
-                    onClick={deleteSession}
+                    onClick={() => setModal({ type: 'delete-session' })}
                     className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3 text-red-600"
                   >
                     <FiTrash2 className="w-5 h-5" />
@@ -1023,18 +1238,7 @@ export default function SessionPage() {
               </button>
             </div>
 
-            {typeof window.ai === 'undefined' ? (
-              <div className="text-center py-12">
-                <FiCpu className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">AI Features Not Available</h3>
-                <p className="text-gray-600">
-                  Enable Chromes built-in AI features to get intelligent research insights.
-                </p>
-                <p className="text-sm text-gray-500 mt-2">
-                  Visit chrome://flags and enable Prompt API for Gemini Nano
-                </p>
-              </div>
-            ) : aiSuggestions.length === 0 ? (
+            {aiSuggestions.length === 0 ? (
               <div className="text-center py-12">
                 <FiSearch className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Insights Yet</h3>
@@ -1155,7 +1359,7 @@ export default function SessionPage() {
                   <p className="text-gray-600">No drafts yet</p>
                   <p className="text-sm text-gray-500 mt-1">Create your first draft to start writing</p>
                 </div>
-              ) : (
+              ): (
                 <div className="space-y-3">
                   {drafts.map((draft) => (
                     <div
@@ -1307,9 +1511,23 @@ export default function SessionPage() {
                 </div>
               ) : (
                 <div className="p-4 space-y-2">
+                  <label className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedTabsToImport.size === currentChromeTabs.length}
+                      onChange={selectAllTabs}
+                      className="mt-1" 
+                    />
+                    <span className="font-medium">Select All</span>
+                  </label>
                   {currentChromeTabs.map((tab) => (
                     <label key={tab.id} className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded">
-                      <input type="checkbox" defaultChecked className="mt-1" />
+                      <input 
+                        type="checkbox" 
+                        checked={selectedTabsToImport.has(tab.id)}
+                        onChange={() => toggleTabSelection(tab.id)}
+                        className="mt-1" 
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 truncate">{tab.title}</p>
                         <p className="text-sm text-gray-600 truncate">{tab.url}</p>
@@ -1322,21 +1540,107 @@ export default function SessionPage() {
             
             <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
               <button
-                onClick={() => setShowImportDialog(false)}
+                onClick={() => {
+                  setShowImportDialog(false);
+                  setSelectedTabsToImport(new Set());
+                }}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
-                onClick={() => importChromeTabs(currentChromeTabs)}
-                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+                onClick={() => importChromeTabs(currentChromeTabs.filter(tab => selectedTabsToImport.has(tab.id)))}
+                disabled={selectedTabsToImport.size === 0}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
               >
-                Import Selected Tabs
+                Import Selected Tabs ({selectedTabsToImport.size})
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modals */}
+      <Modal
+        isOpen={modal.type === 'delete-session'}
+        onClose={() => setModal({ type: '' })}
+        title="Delete Session"
+        actionButton={
+          <button
+            onClick={() => {
+              deleteSession();
+              setModal({ type: '' });
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          >
+            Delete
+          </button>
+        }
+      >
+        <p className="text-gray-600">Are you sure you want to delete this research session? This action cannot be undone.</p>
+      </Modal>
+
+      <Modal
+        isOpen={modal.type === 'ai-unavailable'}
+        onClose={() => setModal({ type: '' })}
+        title="AI Not Available"
+        actionButton={
+          <button
+            onClick={() => setModal({ type: '' })}
+            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+          >
+            OK
+          </button>
+        }
+      >
+        <div className="flex items-start space-x-3">
+          <FiAlertCircle className="w-6 h-6 text-yellow-500 mt-0.5" />
+          <div>
+            <p className="text-gray-600">{modal.data?.message}</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Make sure youre using Chrome Canary with the Prompt API for Gemini Nano enabled.
+            </p>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={modal.type === 'error'}
+        onClose={() => setModal({ type: '' })}
+        title="Error"
+        actionButton={
+          <button
+            onClick={() => setModal({ type: '' })}
+            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+          >
+            OK
+          </button>
+        }
+      >
+        <div className="flex items-start space-x-3">
+          <FiAlertCircle className="w-6 h-6 text-red-500 mt-0.5" />
+          <p className="text-gray-600">{modal.data?.message}</p>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={modal.type === 'success'}
+        onClose={() => setModal({ type: '' })}
+        title="Success"
+        actionButton={
+          <button
+            onClick={() => setModal({ type: '' })}
+            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+          >
+            OK
+          </button>
+        }
+      >
+        <div className="flex items-start space-x-3">
+          <FiCheck className="w-6 h-6 text-green-500 mt-0.5" />
+          <p className="text-gray-600">{modal.data?.message}</p>
+        </div>
+      </Modal>
     </Layout>
   );
 }

@@ -7,17 +7,15 @@ import type { IResearchSession, ITab, IDraft } from '@/types/main.db';
 import { 
   FiPlus, FiUsers, FiUser, FiEdit2, FiTrash2, FiMail, FiBell, 
   FiMessageSquare, FiSearch, FiX, FiExternalLink, FiImage,
-  FiBarChart2, FiClock, FiBook, FiStar, FiZap, FiCpu
+  FiBarChart2, FiClock, FiBook, FiStar, FiZap, FiCpu, FiChevronRight
 } from 'react-icons/fi';
 
 declare global {
   interface Window {
     ai?: {
       prompt: (prompt: string, options?: { signal?: AbortSignal }) => Promise<{ text: () => Promise<string> }>;
-      // Add other AI methods that might be available
-      summarize?: (text: string) => Promise<string>;
-      rewrite?: (text: string, style?: string) => Promise<string>;
     };
+    LanguageModel?: any;
   }
 }
 
@@ -40,9 +38,28 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboardData();
-    // Check if AI is available
-    setAiAvailable(typeof window.ai !== 'undefined');
+    checkAIAvailability();
   }, []);
+
+  const checkAIAvailability = async () => {
+    try {
+      if (typeof window.LanguageModel !== 'undefined') {
+        const opts = {
+          expectedOutputs: [{ type: "text", languages: ["en"] }]
+        };
+
+        const availability = await window.LanguageModel.availability(opts);
+        setAiAvailable(availability === "available");
+      } else if (typeof window.ai !== 'undefined') {
+        setAiAvailable(true);
+      } else {
+        setAiAvailable(false);
+      }
+    } catch (error) {
+      console.error("Error checking AI availability:", error);
+      setAiAvailable(false);
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -105,26 +122,84 @@ Please provide 3-5 concise, practical suggestions in bullet points format:
 
 Focus on actionable insights that would help the researcher move forward.`;
 
-      const response = await window.ai!.prompt(prompt, { signal: AbortSignal.timeout(30000) });
-      const text = await response.text();
+      let suggestions: string[] = [];
       
-      // Parse the response into individual suggestions
-      const suggestions = text.split('\n')
-        .filter(line => line.trim().match(/^[•\-]\s+|^\d+\.\s+/))
-        .map(line => line.replace(/^[•\-]\s+|^\d+\.\s+/, '').trim())
-        .slice(0, 5);
-      
-      setAiSuggestions(suggestions);
+      if (typeof window.LanguageModel !== 'undefined') {
+        // Use the new LanguageModel API
+        (async () => {
+          try {
+            const opts = {
+              expectedOutputs: [{ type: "text", languages: ["en"] }]
+            };
+
+            const availability = await window.LanguageModel.availability(opts);
+            console.log("availability:", availability);
+
+            if (availability === "unavailable") {
+              console.error("❌ Model unavailable.");
+              return;
+            }
+
+            const session = await window.LanguageModel.create({
+              ...opts,
+              monitor(m: any) {
+                m.addEventListener("downloadprogress", (e: any) => {
+                  console.log(`📥 Download progress: ${(e.loaded * 100).toFixed(1)}%`);
+                });
+                m.addEventListener("statechange", (e: any) => {
+                  console.log("⚡ State change:", e.target.state);
+                });
+              }
+            });
+
+            console.log("✅ Session ready:", session);
+
+            const result = await session.prompt(prompt);
+            console.log("☕ Model output:", result);
+            
+            // Parse the response into individual suggestions
+            suggestions = result.split('\n')
+              .filter(line => line.trim().match(/^[•\-]\s+|^\d+\.\s+/))
+              .map(line => line.replace(/^[•\-]\s+|^\d+\.\s+/, '').trim())
+              .slice(0, 5);
+            
+            setAiSuggestions(suggestions);
+          } catch (err) {
+            console.error("Error with LanguageModel:", err);
+            setAiSuggestions(getFallbackSuggestions());
+          }
+        })();
+      } else if (typeof window.ai !== 'undefined') {
+        // Fallback to the older AI API
+        const response = await window.ai!.prompt(prompt, { signal: AbortSignal.timeout(30000) });
+        const text = await response.text();
+        
+        // Parse the response into individual suggestions
+        suggestions = text.split('\n')
+          .filter(line => line.trim().match(/^[•\-]\s+|^\d+\.\s+/))
+          .map(line => line.replace(/^[•\-]\s+|^\d+\.\s+/, '').trim())
+          .slice(0, 5);
+        
+        setAiSuggestions(suggestions);
+      } else {
+        setAiSuggestions(getFallbackSuggestions());
+      }
     } catch (error) {
       console.warn('AI suggestion generation failed:', error);
-      setAiSuggestions([
-        "Analyze connections between your recent research topics",
-        "Consider creating a synthesis document from your collected tabs",
-        "Look for patterns in your research sessions over time"
-      ]);
+      setAiSuggestions(getFallbackSuggestions());
     } finally {
       setIsGeneratingAI(false);
     }
+  };
+
+  const getFallbackSuggestions = () => {
+    return [
+      "Analyze connections between your recent research topics",
+      "Consider creating a synthesis document from your collected tabs",
+      "Look for patterns in your research sessions over time",
+      "Identify key themes across your research materials",
+      "Create an outline for a research paper based on your findings"
+    ];
   };
 
   const createNewSession = async () => {
@@ -158,11 +233,28 @@ Focus on actionable insights that would help the researcher move forward.`;
     }
 
     try {
-      const response = await window.ai!.prompt(
-        `Create a concise summary of this research content:\n\n${content.substring(0, 1500)}`,
-        { signal: AbortSignal.timeout(15000) }
-      );
-      return await response.text();
+      if (typeof window.LanguageModel !== 'undefined') {
+        const opts = {
+          expectedOutputs: [{ type: "text", languages: ["en"] }]
+        };
+
+        const availability = await window.LanguageModel.availability(opts);
+        if (availability === "unavailable") {
+          return 'Unable to generate summary at this time';
+        }
+
+        const session = await window.LanguageModel.create(opts);
+        const result = await session.prompt(
+          `Create a concise summary of this research content:\n\n${content.substring(0, 1500)}`
+        );
+        return result;
+      } else if (typeof window.ai !== 'undefined') {
+        const response = await window.ai!.prompt(
+          `Create a concise summary of this research content:\n\n${content.substring(0, 1500)}`,
+          { signal: AbortSignal.timeout(15000) }
+        );
+        return await response.text();
+      }
     } catch (error) {
       console.error('AI summarization failed:', error);
       return 'Unable to generate summary at this time';
@@ -199,7 +291,7 @@ Focus on actionable insights that would help the researcher move forward.`;
           <div className="flex flex-wrap gap-2">
             <button
               onClick={createNewSession}
-              className="bg-black text-white px-6 py-3 rounded-lg hover:bg-gray-800 transition-colors flex items-center space-x-2"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2 shadow-md"
             >
               <FiPlus className="w-5 h-5" />
               <span>New Session</span>
@@ -222,7 +314,7 @@ Focus on actionable insights that would help the researcher move forward.`;
             { label: 'Drafts', value: stats.totalDrafts, icon: FiEdit2, color: 'purple' },
             { label: 'Last Active', value: stats.lastActive ? formatDate(stats.lastActive) : 'Never', icon: FiClock, color: 'orange' }
           ].map((stat, index) => (
-            <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+            <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">{stat.label}</p>
@@ -240,7 +332,14 @@ Focus on actionable insights that would help the researcher move forward.`;
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">Research Sessions</h2>
-                <FiSearch className="w-5 h-5 text-gray-400" />
+                <div className="relative">
+                  <FiSearch className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+                  <input 
+                    type="text" 
+                    placeholder="Search sessions..." 
+                    className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -250,7 +349,7 @@ Focus on actionable insights that would help the researcher move forward.`;
                     <p className="text-gray-600">No research sessions yet</p>
                     <button
                       onClick={createNewSession}
-                      className="text-black hover:underline mt-2"
+                      className="text-blue-600 hover:underline mt-2 font-medium"
                     >
                       Create your first session
                     </button>
@@ -259,7 +358,7 @@ Focus on actionable insights that would help the researcher move forward.`;
                   sessions.map((session) => (
                     <div
                       key={session.id}
-                      className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-colors group"
                       onClick={() => router.push(`/session/${session.id}`)}
                     >
                       <div className="flex-1 min-w-0">
@@ -268,13 +367,16 @@ Focus on actionable insights that would help the researcher move forward.`;
                           Created {formatDate(session.created_at)}
                         </p>
                       </div>
-                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="p-1 hover:bg-gray-100 rounded">
-                          <FiEdit2 className="w-4 h-4 text-gray-600" />
-                        </button>
-                        <button className="p-1 hover:bg-gray-100 rounded">
-                          <FiTrash2 className="w-4 h-4 text-gray-600" />
-                        </button>
+                      <div className="flex items-center space-x-2">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex">
+                          <button className="p-1 hover:bg-gray-100 rounded">
+                            <FiEdit2 className="w-4 h-4 text-gray-600" />
+                          </button>
+                          <button className="p-1 hover:bg-gray-100 rounded">
+                            <FiTrash2 className="w-4 h-4 text-gray-600" />
+                          </button>
+                        </div>
+                        <FiChevronRight className="w-5 h-5 text-gray-400 group-hover:text-gray-600" />
                       </div>
                     </div>
                   ))
@@ -284,15 +386,21 @@ Focus on actionable insights that would help the researcher move forward.`;
 
             {/* Recent Drafts */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Recent Drafts</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-900">Recent Drafts</h2>
+                <button className="text-blue-600 text-sm font-medium">View all</button>
+              </div>
               <div className="space-y-3">
                 {drafts.length === 0 ? (
-                  <p className="text-gray-600 text-center py-6">No drafts yet</p>
+                  <div className="text-center py-6">
+                    <FiEdit2 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-600">No drafts yet</p>
+                  </div>
                 ) : (
                   drafts.map((draft) => (
-                    <div key={draft.id} className="border border-gray-200 rounded-lg p-3 hover:bg-gray-50 cursor-pointer">
+                    <div key={draft.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer transition-colors">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-600">
+                        <span className="text-sm font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded">
                           Version {draft.version}
                         </span>
                         <span className="text-sm text-gray-500">
@@ -302,6 +410,9 @@ Focus on actionable insights that would help the researcher move forward.`;
                       <p className="text-gray-900 line-clamp-2 text-sm">
                         {draft.content.substring(0, 150)}...
                       </p>
+                      <div className="mt-2 flex justify-end">
+                        <button className="text-blue-600 text-xs font-medium">Continue editing</button>
+                      </div>
                     </div>
                   ))
                 )}
@@ -333,12 +444,12 @@ Focus on actionable insights that would help the researcher move forward.`;
                 <p className="text-gray-600 text-sm">Analyzing your research...</p>
               </div>
             ) : aiSuggestions.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <h3 className="font-medium text-gray-900 text-sm mb-2">Suggestions:</h3>
                 {aiSuggestions.map((suggestion, index) => (
                   <div
                     key={index}
-                    className="bg-blue-50 border border-blue-200 rounded-lg p-3"
+                    className="bg-blue-50 border border-blue-200 rounded-lg p-3 hover:bg-blue-100 transition-colors cursor-pointer"
                   >
                     <p className="text-sm text-blue-900">{suggestion}</p>
                   </div>
@@ -358,14 +469,17 @@ Focus on actionable insights that would help the researcher move forward.`;
             <div className="mt-6 pt-4 border-t border-gray-200">
               <h3 className="font-medium text-gray-900 text-sm mb-3">Quick Actions</h3>
               <div className="space-y-2">
-                <button className="w-full text-left p-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  Export Research Data
+                <button className="w-full text-left p-3 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between">
+                  <span>Export Research Data</span>
+                  <FiExternalLink className="w-4 h-4 text-gray-400" />
                 </button>
-                <button className="w-full text-left p-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  Generate Summary Report
+                <button className="w-full text-left p-3 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between">
+                  <span>Generate Summary Report</span>
+                  <FiBarChart2 className="w-4 h-4 text-gray-400" />
                 </button>
-                <button className="w-full text-left p-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  Analyze Research Patterns
+                <button className="w-full text-left p-3 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-between">
+                  <span>Analyze Research Patterns</span>
+                  <FiSearch className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
             </div>
