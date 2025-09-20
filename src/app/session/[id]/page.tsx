@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
@@ -8,7 +8,8 @@ import {
   FiPlus, FiEdit2, FiTrash2, FiSave, FiCopy, FiDownload,
   FiExternalLink, FiZap, FiCpu, FiBook, FiLink, FiClock,
   FiUser, FiMessageSquare, FiRefreshCw, FiChevronDown,
-  FiChevronUp, FiSearch, FiFilter, FiShare2, FiBookmark
+  FiChevronUp, FiSearch, FiFilter, FiShare2, FiBookmark,
+  FiSend, FiX, FiCheck, FiEdit3, FiMoreVertical
 } from 'react-icons/fi';
 
 declare global {
@@ -16,13 +17,24 @@ declare global {
     ai?: {
       prompt: (prompt: string, options?: { signal?: AbortSignal }) => Promise<{ text: () => Promise<string> }>;
     };
+    chrome?: {
+      tabs?: {
+        query: (options: any, callback: (tabs: any[]) => void) => void;
+      };
+    };
   }
 }
 
 interface AISuggestion {
-  type: 'summary' | 'analysis' | 'connection' | 'suggestion';
+  type: 'summary' | 'analysis' | 'connection' | 'suggestion' | 'outline';
   content: string;
   confidence: number;
+}
+
+interface AIChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
 }
 
 export default function SessionPage() {
@@ -30,6 +42,7 @@ export default function SessionPage() {
   const router = useRouter();
   const sessionId = params.id as string;
   const supabase = createClient();
+  const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [session, setSession] = useState<IResearchSession | null>(null);
   const [tabs, setTabs] = useState<ITab[]>([]);
@@ -40,12 +53,39 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(true);
   const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-  const [activeTab, setActiveTab] = useState<'content' | 'ai' | 'drafts'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'ai' | 'drafts' | 'chat'>('content');
   const [expandedTabs, setExpandedTabs] = useState<Set<string>>(new Set());
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState('');
+  const [currentChromeTabs, setCurrentChromeTabs] = useState<any[]>([]);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [chatMessages, setChatMessages] = useState<AIChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
 
   useEffect(() => {
     loadSessionData();
+    detectChromeTabs();
   }, [sessionId]);
+
+  useEffect(() => {
+    // Scroll to bottom of chat when new messages are added
+    if (chatEndRef.current && activeTab === 'chat') {
+      chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, activeTab]);
+
+  const detectChromeTabs = () => {
+    if (typeof window.chrome !== 'undefined' && window.chrome.tabs) {
+      try {
+        window.chrome.tabs.query({ currentWindow: true }, (tabs) => {
+          setCurrentChromeTabs(tabs);
+        });
+      } catch (error) {
+        console.warn('Could not access Chrome tabs API:', error);
+      }
+    }
+  };
 
   const loadSessionData = async () => {
     try {
@@ -82,7 +122,10 @@ export default function SessionPage() {
         .select('*')
         .in('tab_id', tabsData?.map(tab => tab.id) || []);
 
-      if (sessionData) setSession(sessionData);
+      if (sessionData) {
+        setSession(sessionData);
+        setEditedTitle(sessionData.title);
+      }
       if (tabsData) setTabs(tabsData);
       if (draftsData) {
         setDrafts(draftsData);
@@ -105,32 +148,77 @@ export default function SessionPage() {
     }
   };
 
+  const importChromeTabs = async (tabsToImport: any[]) => {
+    try {
+      const newTabs: ITab[] = [];
+      
+      for (const tab of tabsToImport) {
+        // Extract content from the tab (this would need a more sophisticated approach in a real extension)
+        let content = '';
+        try {
+          // This is a simplified approach - in a real extension, you'd use a content script
+          content = tab.title || '';
+        } catch (e) {
+          console.warn(`Could not extract content from tab: ${tab.url}`, e);
+        }
+        
+        const { data, error } = await supabase
+          .from('tabs')
+          .insert([{
+            session_id: sessionId,
+            url: tab.url,
+            title: tab.title,
+            content: content
+          }])
+          .select()
+          .single();
+          
+        if (data && !error) {
+          newTabs.push(data);
+        }
+      }
+      
+      if (newTabs.length > 0) {
+        setTabs(prev => [...newTabs, ...prev]);
+        // Generate AI insights for the new tabs
+        if (typeof window.ai !== 'undefined') {
+          generateInitialAISuggestions([...newTabs, ...tabs], summaries);
+        }
+      }
+      
+      setShowImportDialog(false);
+    } catch (error) {
+      console.error('Error importing tabs:', error);
+    }
+  };
+
   const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[]) => {
     setIsGeneratingAI(true);
     try {
-      const tabContents = tabs.map(tab => tab.content || tab.title || tab.url).join('\n\n');
+      const tabContents = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
       const summaryContents = summaries.map(s => s.summary).join('\n\n');
 
       const prompt = `
         Analyze this research session content and provide insights:
 
-        Tabs Content:
-        ${tabContents.substring(0, 3000)}
+        RESEARCH TABS:
+        ${tabContents.substring(0, 4000)}
 
-        Existing Summaries:
+        EXISTING SUMMARIES:
         ${summaryContents.substring(0, 2000)}
 
         Provide 3-5 insights in this format:
-        TYPE: SUMMARY|ANALYSIS|CONNECTION|SUGGESTION
+        TYPE: SUMMARY|ANALYSIS|CONNECTION|SUGGESTION|OUTLINE
         CONFIDENCE: 0.8
         CONTENT: Your insight here
 
         Focus on:
-        - Key themes and patterns
-        - Research gaps
-        - Potential connections
-        - Next steps
-        - Content organization
+        - Key themes and patterns across the research
+        - Research gaps and unanswered questions
+        - Potential connections between different sources
+        - Next steps for the research
+        - Content organization and structure suggestions
+        - Outline for a research paper based on this content
       `;
 
       const response = await window.ai!.prompt(prompt);
@@ -173,16 +261,23 @@ export default function SessionPage() {
     setAiSuggestions(suggestions.slice(0, 5));
   };
 
-  const generateAISummary = async (tabId: string, content: string) => {
+  const generateAISummary = async (tabId: string, content: string, title: string, url: string) => {
     if (typeof window.ai === 'undefined') return;
 
     try {
       const response = await window.ai.prompt(`
-        Summarize this research content concisely for academic purposes:
+        Summarize this research content for academic purposes. Focus on key points, arguments, and evidence:
         
-        ${content.substring(0, 2500)}
+        TITLE: ${title}
+        URL: ${url}
+        CONTENT: ${content.substring(0, 3000)}
         
-        Provide a clear, structured summary with key points.
+        Provide a clear, structured summary with these sections:
+        1. Main thesis or purpose
+        2. Key findings or arguments
+        3. Methodology (if apparent)
+        4. Conclusions or implications
+        5. Relevance to broader research
       `);
 
       const summary = await response.text();
@@ -209,33 +304,101 @@ export default function SessionPage() {
     }
   };
 
-  const generateResearchDraft = async () => {
+  const generateResearchDraft = async (type: 'full' | 'outline' | 'introduction' | 'conclusion' = 'full') => {
     if (typeof window.ai === 'undefined' || tabs.length === 0) return;
 
     setIsGeneratingAI(true);
     try {
-      const allContent = tabs.map(tab => tab.content || tab.title || '').join('\n\n');
+      const allContent = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
       const allSummaries = summaries.map(s => s.summary).join('\n\n');
 
-      const response = await window.ai.prompt(`
-        Create a comprehensive research draft based on this content:
+      let prompt = '';
+      
+      if (type === 'outline') {
+        prompt = `
+          Create a detailed research paper outline based on this content:
 
-        Research Content:
-        ${allContent.substring(0, 4000)}
+          RESEARCH CONTENT:
+          ${allContent.substring(0, 4000)}
 
-        Summaries:
-        ${allSummaries.substring(0, 2000)}
+          SUMMARIES:
+          ${allSummaries.substring(0, 2000)}
 
-        Create a well-structured research draft with:
-        1. Introduction
-        2. Key findings
-        3. Analysis
-        4. Conclusions
-        5. References (if any URLs are provided)
+          Create a comprehensive outline with:
+          1. Title suggestion
+          2. Abstract structure
+          3. Introduction section
+          4. Literature review (if applicable)
+          5. Methodology section
+          6. Results/findings sections
+          7. Discussion/analysis sections
+          8. Conclusion section
+          9. References
 
-        Format it professionally for academic research.
-      `);
+          Use proper academic formatting with headings and subheadings.
+        `;
+      } else if (type === 'introduction') {
+        prompt = `
+          Write a compelling introduction for a research paper based on this content:
 
+          RESEARCH CONTENT:
+          ${allContent.substring(0, 4000)}
+
+          SUMMARIES:
+          ${allSummaries.substring(0, 2000)}
+
+          The introduction should:
+          1. Start with a hook/background context
+          2. State the research problem/question
+          3. Explain the significance of the research
+          4. Provide a brief literature context
+          5. State the paper's thesis and objectives
+          6. Outline the paper's structure
+        `;
+      } else if (type === 'conclusion') {
+        prompt = `
+          Write a strong conclusion for a research paper based on this content:
+
+          RESEARCH CONTENT:
+          ${allContent.substring(0, 4000)}
+
+          SUMMARIES:
+          ${allSummaries.substring(0, 2000)}
+
+          The conclusion should:
+          1. Restate the thesis and main findings
+          2. Summarize the key arguments/evidence
+          3. Discuss the implications of the research
+          4. Acknowledge limitations
+          5. Suggest directions for future research
+          6. End with a strong concluding statement
+        `;
+      } else {
+        prompt = `
+          Create a comprehensive research draft based on this content:
+
+          RESEARCH CONTENT:
+          ${allContent.substring(0, 4000)}
+
+          SUMMARIES:
+          ${allSummaries.substring(0, 2000)}
+
+          Create a well-structured research draft with:
+          1. Title
+          2. Abstract
+          3. Introduction with thesis statement
+          4. Literature review (if applicable)
+          5. Methodology section
+          6. Results/findings with evidence
+          7. Discussion/analysis of results
+          8. Conclusion with implications
+          9. References (include any URLs from the research)
+
+          Format it professionally for academic research with clear section headings.
+        `;
+      }
+
+      const response = await window.ai.prompt(prompt);
       const draft = await response.text();
       setCurrentDraft(draft);
       
@@ -266,6 +429,113 @@ export default function SessionPage() {
     }
   };
 
+  const updateSessionTitle = async () => {
+    if (!session || !editedTitle.trim()) return;
+
+    try {
+      const { data } = await supabase
+        .from('research_sessions')
+        .update({ title: editedTitle })
+        .eq('id', session.id)
+        .select()
+        .single();
+
+      if (data) {
+        setSession(data);
+        setIsEditingTitle(false);
+      }
+    } catch (error) {
+      console.error('Error updating session title:', error);
+    }
+  };
+
+  const deleteSession = async () => {
+    if (!session) return;
+
+    if (confirm('Are you sure you want to delete this research session? This action cannot be undone.')) {
+      try {
+        await supabase
+          .from('research_sessions')
+          .delete()
+          .eq('id', session.id);
+
+        router.push('/dashboard');
+      } catch (error) {
+        console.error('Error deleting session:', error);
+      }
+    }
+  };
+
+  const exportSessionData = async () => {
+    // Prepare data for export
+    const exportData = {
+      session,
+      tabs,
+      summaries,
+      drafts,
+      exportedAt: new Date().toISOString()
+    };
+
+    // Create a blob and download link
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `research-session-${session?.title || 'export'}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const duplicateSession = async () => {
+    if (!session) return;
+
+    try {
+      // Create a new session with similar title
+      const { data: newSession } = await supabase
+        .from('research_sessions')
+        .insert([{ 
+          title: `${session.title} (Copy)`,
+          user_id: session.user_id
+        }])
+        .select()
+        .single();
+
+      if (newSession) {
+        // Copy all tabs
+        for (const tab of tabs) {
+          await supabase
+            .from('tabs')
+            .insert([{
+              session_id: newSession.id,
+              url: tab.url,
+              title: tab.title,
+              content: tab.content
+            }]);
+        }
+
+        // Navigate to the new session
+        router.push(`/session/${newSession.id}`);
+      }
+    } catch (error) {
+      console.error('Error duplicating session:', error);
+    }
+  };
+
+  const shareSession = async () => {
+    // In a real app, this would generate a shareable link or use a sharing API
+    const sessionUrl = `${window.location.origin}/session/${sessionId}`;
+    
+    try {
+      await navigator.clipboard.writeText(sessionUrl);
+      alert('Session link copied to clipboard!');
+    } catch (error) {
+      console.error('Failed to copy link:', error);
+      prompt('Copy this session link:', sessionUrl);
+    }
+  };
+
   const toggleTabExpansion = (tabId: string) => {
     const newExpanded = new Set(expandedTabs);
     if (newExpanded.has(tabId)) {
@@ -274,6 +544,81 @@ export default function SessionPage() {
       newExpanded.add(tabId);
     }
     setExpandedTabs(newExpanded);
+  };
+
+  const handleChatSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isChatLoading) return;
+
+    // Add user message to chat
+    const userMessage: AIChatMessage = {
+      role: 'user',
+      content: chatInput,
+      timestamp: new Date()
+    };
+    
+    setChatMessages(prev => [...prev, userMessage]);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    try {
+      // Prepare context from the research session
+      const tabContext = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
+      const summaryContext = summaries.map(s => s.summary).join('\n\n');
+      const draftContext = drafts.length > 0 ? drafts[0].content.substring(0, 1000) : '';
+
+      const prompt = `
+        You are a research assistant helping with a research session. 
+        
+        RESEARCH CONTEXT:
+        ${tabContext.substring(0, 3000)}
+        
+        SUMMARIES:
+        ${summaryContext.substring(0, 1500)}
+        
+        CURRENT DRAFT:
+        ${draftContext}
+        
+        USER QUESTION: ${chatInput}
+        
+        Provide a helpful, focused response based on the research content. Be specific and reference the available research materials when possible.
+      `;
+
+      if (typeof window.ai !== 'undefined') {
+        const response = await window.ai.prompt(prompt);
+        const text = await response.text();
+        
+        // Add AI response to chat
+        const aiMessage: AIChatMessage = {
+          role: 'assistant',
+          content: text,
+          timestamp: new Date()
+        };
+        
+        setChatMessages(prev => [...prev, aiMessage]);
+      } else {
+        // Fallback response if AI is not available
+        const aiMessage: AIChatMessage = {
+          role: 'assistant',
+          content: "I'm sorry, but the AI features are currently unavailable. Please make sure you're using a compatible browser with AI capabilities enabled.",
+          timestamp: new Date()
+        };
+        
+        setChatMessages(prev => [...prev, aiMessage]);
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      
+      const errorMessage: AIChatMessage = {
+        role: 'assistant',
+        content: "I encountered an error while processing your request. Please try again later.",
+        timestamp: new Date()
+      };
+      
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsChatLoading(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -326,15 +671,58 @@ export default function SessionPage() {
             >
               ← Back to Dashboard
             </button>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{session.title}</h1>
+            
+            <div className="flex items-center gap-3 mb-2">
+              {isEditingTitle ? (
+                <>
+                  <input
+                    type="text"
+                    value={editedTitle}
+                    onChange={(e) => setEditedTitle(e.target.value)}
+                    className="text-3xl font-bold text-gray-900 bg-transparent border-b border-gray-300 focus:border-black focus:outline-none"
+                    autoFocus
+                  />
+                  <button
+                    onClick={updateSessionTitle}
+                    className="p-1 text-green-600 hover:bg-green-100 rounded"
+                  >
+                    <FiCheck className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsEditingTitle(false);
+                      setEditedTitle(session.title);
+                    }}
+                    className="p-1 text-red-600 hover:bg-red-100 rounded"
+                  >
+                    <FiX className="w-5 h-5" />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-3xl font-bold text-gray-900">{session.title}</h1>
+                  <button
+                    onClick={() => setIsEditingTitle(true)}
+                    className="p-1 text-gray-600 hover:bg-gray-100 rounded"
+                  >
+                    <FiEdit3 className="w-5 h-5" />
+                  </button>
+                </>
+              )}
+            </div>
+            
             <p className="text-gray-600">
               Created {formatDate(session.created_at)} • {tabs.length} tabs • {drafts.length} drafts
             </p>
           </div>
           
           <div className="flex space-x-3">
-            <button className="bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
-              <FiShare2 className="w-5 h-5" />
+            <button 
+              onClick={shareSession}
+              className="bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
+            >
+              <FiShare2 className="w-5 h-5 mr-2" />
+              Share
             </button>
             <button className="bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
               <FiBookmark className="w-5 h-5" />
@@ -343,10 +731,10 @@ export default function SessionPage() {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-gray-200 mb-8">
+        <div className="flex border-b border-gray-200 mb-8 overflow-x-auto">
           <button
             onClick={() => setActiveTab('content')}
-            className={`px-6 py-3 border-b-2 font-medium ${
+            className={`px-6 py-3 border-b-2 font-medium whitespace-nowrap ${
               activeTab === 'content'
                 ? 'border-black text-black'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -356,7 +744,7 @@ export default function SessionPage() {
           </button>
           <button
             onClick={() => setActiveTab('ai')}
-            className={`px-6 py-3 border-b-2 font-medium ${
+            className={`px-6 py-3 border-b-2 font-medium whitespace-nowrap ${
               activeTab === 'ai'
                 ? 'border-black text-black'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
@@ -366,13 +754,23 @@ export default function SessionPage() {
           </button>
           <button
             onClick={() => setActiveTab('drafts')}
-            className={`px-6 py-3 border-b-2 font-medium ${
+            className={`px-6 py-3 border-b-2 font-medium whitespace-nowrap ${
               activeTab === 'drafts'
                 ? 'border-black text-black'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
             Drafts
+          </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`px-6 py-3 border-b-2 font-medium whitespace-nowrap ${
+              activeTab === 'chat'
+                ? 'border-black text-black'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            AI Chat
           </button>
         </div>
 
@@ -383,14 +781,25 @@ export default function SessionPage() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-gray-900">Research Tabs</h2>
-                <span className="text-sm text-gray-600">{tabs.length} tabs</span>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">{tabs.length} tabs</span>
+                  {currentChromeTabs.length > 0 && (
+                    <button
+                      onClick={() => setShowImportDialog(true)}
+                      className="flex items-center space-x-1 px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm hover:bg-blue-200"
+                    >
+                      <FiPlus className="w-4 h-4" />
+                      <span>Import Tabs</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {tabs.length === 0 ? (
                 <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
                   <FiLink className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-600">No research tabs yet</p>
-                  <p className="text-sm text-gray-500 mt-1">Import tabs using the browser extension</p>
+                  <p className="text-sm text-gray-500 mt-1">Import tabs using the button above</p>
                 </div>
               ) : (
                 tabs.map((tab) => {
@@ -446,7 +855,7 @@ export default function SessionPage() {
                           <div className="mt-4 flex space-x-2">
                             {!tabSummary && typeof window.ai !== 'undefined' && (
                               <button
-                                onClick={() => generateAISummary(tab.id, tab.content || '')}
+                                onClick={() => generateAISummary(tab.id, tab.content || '', tab.title || '', tab.url)}
                                 className="flex items-center space-x-2 px-3 py-1 bg-blue-100 text-blue-800 rounded text-sm hover:bg-blue-200"
                               >
                                 <FiZap className="w-4 h-4" />
@@ -486,20 +895,60 @@ export default function SessionPage() {
                     <p className="text-blue-800 text-sm">
                       Generate comprehensive research drafts using AI analysis of your collected content
                     </p>
-                    <button
-                      onClick={generateResearchDraft}
-                      disabled={isGeneratingAI || tabs.length === 0}
-                      className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                    >
-                      {isGeneratingAI ? (
-                        <FiRefreshCw className="w-5 h-5 animate-spin" />
-                      ) : (
-                        <FiZap className="w-5 h-5" />
-                      )}
-                      <span>
-                        {isGeneratingAI ? 'Generating...' : 'Generate Research Draft'}
-                      </span>
-                    </button>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => generateResearchDraft('outline')}
+                        disabled={isGeneratingAI || tabs.length === 0}
+                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                      >
+                        {isGeneratingAI ? (
+                          <FiRefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <FiBook className="w-4 h-4" />
+                        )}
+                        <span>Outline</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => generateResearchDraft('full')}
+                        disabled={isGeneratingAI || tabs.length === 0}
+                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                      >
+                        {isGeneratingAI ? (
+                          <FiRefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <FiZap className="w-4 h-4" />
+                        )}
+                        <span>Full Draft</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => generateResearchDraft('introduction')}
+                        disabled={isGeneratingAI || tabs.length === 0}
+                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                      >
+                        {isGeneratingAI ? (
+                          <FiRefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <FiEdit2 className="w-4 h-4" />
+                        )}
+                        <span>Introduction</span>
+                      </button>
+                      
+                      <button
+                        onClick={() => generateResearchDraft('conclusion')}
+                        disabled={isGeneratingAI || tabs.length === 0}
+                        className="bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2 text-sm"
+                      >
+                        {isGeneratingAI ? (
+                          <FiRefreshCw className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <FiCheck className="w-4 h-4" />
+                        )}
+                        <span>Conclusion</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -531,16 +980,25 @@ export default function SessionPage() {
               <div className="bg-white border border-gray-200 rounded-lg p-6">
                 <h3 className="font-semibold text-gray-900 mb-4">Quick Actions</h3>
                 <div className="space-y-2">
-                  <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
+                  <button 
+                    onClick={exportSessionData}
+                    className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+                  >
                     <FiDownload className="w-5 h-5 text-gray-600" />
                     <span>Export Session Data</span>
                   </button>
-                  <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
+                  <button 
+                    onClick={duplicateSession}
+                    className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3"
+                  >
                     <FiCopy className="w-5 h-5 text-gray-600" />
                     <span>Duplicate Session</span>
                   </button>
-                  <button className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3">
-                    <FiTrash2 className="w-5 h-5 text-gray-600" />
+                  <button 
+                    onClick={deleteSession}
+                    className="w-full text-left p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3 text-red-600"
+                  >
+                    <FiTrash2 className="w-5 h-5" />
                     <span>Delete Session</span>
                   </button>
                 </div>
@@ -555,6 +1013,14 @@ export default function SessionPage() {
             <div className="flex items-center space-x-3 mb-6">
               <FiCpu className="w-6 h-6 text-purple-600" />
               <h2 className="text-xl font-semibold text-gray-900">AI-Powered Insights</h2>
+              <button
+                onClick={() => generateInitialAISuggestions(tabs, summaries)}
+                disabled={isGeneratingAI || tabs.length === 0}
+                className="ml-auto flex items-center space-x-2 px-3 py-1 bg-purple-100 text-purple-800 rounded text-sm hover:bg-purple-200 disabled:opacity-50"
+              >
+                <FiRefreshCw className={`w-4 h-4 ${isGeneratingAI ? 'animate-spin' : ''}`} />
+                <span>Regenerate</span>
+              </button>
             </div>
 
             {typeof window.ai === 'undefined' ? (
@@ -599,6 +1065,8 @@ export default function SessionPage() {
                         ? 'bg-green-50 border-green-200'
                         : suggestion.type === 'connection'
                         ? 'bg-purple-50 border-purple-200'
+                        : suggestion.type === 'outline'
+                        ? 'bg-orange-50 border-orange-200'
                         : 'bg-yellow-50 border-yellow-200'
                     }`}
                   >
@@ -610,6 +1078,8 @@ export default function SessionPage() {
                           ? 'bg-green-100 text-green-800'
                           : suggestion.type === 'connection'
                           ? 'bg-purple-100 text-purple-800'
+                          : suggestion.type === 'outline'
+                          ? 'bg-orange-100 text-orange-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
                         {suggestion.type.toUpperCase()}
@@ -618,7 +1088,20 @@ export default function SessionPage() {
                         Confidence: {(suggestion.confidence * 100).toFixed(0)}%
                       </span>
                     </div>
-                    <p className="text-gray-900">{suggestion.content}</p>
+                    <p className="text-gray-900 whitespace-pre-wrap">{suggestion.content}</p>
+                    
+                    {suggestion.type === 'outline' && (
+                      <button
+                        onClick={() => {
+                          setCurrentDraft(suggestion.content);
+                          setActiveTab('drafts');
+                        }}
+                        className="mt-3 text-sm text-blue-600 hover:text-blue-800 flex items-center"
+                      >
+                        <FiEdit2 className="w-4 h-4 mr-1" />
+                        Use this outline
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -652,7 +1135,10 @@ export default function SessionPage() {
                   <FiSave className="w-4 h-4" />
                   <span>Save Draft</span>
                 </button>
-                <button className="border border-gray-300 px-6 py-2 rounded-lg hover:bg-gray-50 flex items-center space-x-2">
+                <button 
+                  onClick={exportSessionData}
+                  className="border border-gray-300 px-6 py-2 rounded-lg hover:bg-gray-50 flex items-center space-x-2"
+                >
                   <FiDownload className="w-4 h-4" />
                   <span>Export</span>
                 </button>
@@ -694,7 +1180,163 @@ export default function SessionPage() {
             </div>
           </div>
         )}
+
+        {/* AI Chat Tab */}
+        {activeTab === 'chat' && (
+          <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center space-x-3">
+                <FiMessageSquare className="w-6 h-6 text-blue-600" />
+                <h2 className="text-xl font-semibold text-gray-900">AI Research Assistant</h2>
+              </div>
+              <p className="text-gray-600 mt-2">Ask questions about your research and get AI-powered insights.</p>
+            </div>
+
+            <div className="h-96 overflow-y-auto p-6 space-y-4">
+              {chatMessages.length === 0 ? (
+                <div className="text-center py-12">
+                  <FiMessageSquare className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Start a conversation</h3>
+                  <p className="text-gray-600">Ask about your research, request analysis, or get writing suggestions.</p>
+                  
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setChatInput("What are the main themes in my research?")}
+                      className="p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <span className="font-medium">Key themes</span>
+                      <p className="text-sm text-gray-600 mt-1">What are the main themes in my research?</p>
+                    </button>
+                    
+                    <button
+                      onClick={() => setChatInput("Suggest improvements for my draft")}
+                      className="p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <span className="font-medium">Draft feedback</span>
+                      <p className="text-sm text-gray-600 mt-1">Suggest improvements for my draft</p>
+                    </button>
+                    
+                    <button
+                      onClick={() => setChatInput("What connections exist between my sources?")}
+                      className="p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <span className="font-medium">Find connections</span>
+                      <p className="text-sm text-gray-600 mt-1">What connections exist between my sources?</p>
+                    </button>
+                    
+                    <button
+                      onClick={() => setChatInput("Help me structure my research paper")}
+                      className="p-3 text-left border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <span className="font-medium">Structure help</span>
+                      <p className="text-sm text-gray-600 mt-1">Help me structure my research paper</p>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                chatMessages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-3/4 rounded-lg p-4 ${
+                        message.role === 'user'
+                          ? 'bg-blue-100 text-blue-900'
+                          : 'bg-gray-100 text-gray-900'
+                      }`}
+                    >
+                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      <p className="text-xs mt-2 opacity-70">
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
+              {isChatLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 text-gray-900 rounded-lg p-4 max-w-3/4">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            <div className="border-t border-gray-200 p-4">
+              <form onSubmit={handleChatSubmit} className="flex space-x-3">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="Ask about your research..."
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+                  disabled={isChatLoading}
+                />
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || isChatLoading}
+                  className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <FiSend className="w-5 h-5" />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Import Tabs Dialog */}
+      {showImportDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-96 overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Import Chrome Tabs</h3>
+              <p className="text-gray-600 mt-1">Select tabs to import into your research session</p>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {currentChromeTabs.length === 0 ? (
+                <div className="p-6 text-center">
+                  <p className="text-gray-600">No Chrome tabs detected</p>
+                </div>
+              ) : (
+                <div className="p-4 space-y-2">
+                  {currentChromeTabs.map((tab) => (
+                    <label key={tab.id} className="flex items-start space-x-3 p-2 hover:bg-gray-50 rounded">
+                      <input type="checkbox" defaultChecked className="mt-1" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{tab.title}</p>
+                        <p className="text-sm text-gray-600 truncate">{tab.url}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowImportDialog(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => importChromeTabs(currentChromeTabs)}
+                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+              >
+                Import Selected Tabs
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
