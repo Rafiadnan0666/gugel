@@ -1644,3 +1644,4 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
     </Layout>
   );
 }
+
