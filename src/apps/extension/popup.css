@@ -1,0 +1,21 @@
+body {
+  width: 300px;
+  font-family: sans-serif;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+textarea {
+  height: 100px;
+  resize: vertical;
+}
+
+#response {
+  border: 1px solid #ccc;
+  padding: 10px;
+  min-height: 50px;
+}

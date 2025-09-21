@@ -15,13 +15,18 @@ import {
   FiLogOut,
   FiUser,
   FiSettings,
-  FiActivity
+  FiActivity,
+  FiBook,
+  FiArchive,
+  FiDownload,
+  FiUploadCloud,
+  FiCoffee
 } from "react-icons/fi";
 import { createClient } from '@/utils/supabase/client';
 import { IoMdRocket } from "react-icons/io";
 import { RiCompassDiscoverLine } from "react-icons/ri";
 import { debounce } from 'lodash';
-import type { IUser, ITeam, INotification } from '@/types/main.db';
+import type {  IResearchSession } from '@/types/main.db';
 
 const Sidebar = () => {
   const router = useRouter();
@@ -29,15 +34,19 @@ const Sidebar = () => {
   const supabase = createClient();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [teams, setTeams] = useState<ITeam[]>([]);
+  const [researchSessions, setResearchSessions] = useState<IResearchSession[]>([]);
   const [isTeamsDropdownOpen, setIsTeamsDropdownOpen] = useState(false);
+  const [isSessionsDropdownOpen, setIsSessionsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [user, setUser] = useState<IUser | null>(null);
   const [notifications, setNotifications] = useState<INotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [offlineData, setOfflineData] = useState<any>(null);
 
-  // Fetch user data and teams
+  // Fetch user data, teams, and research sessions
   useEffect(() => {
     const fetchData = async () => {
       const { data: { user: authUser }, error } = await supabase.auth.getUser();
@@ -75,12 +84,45 @@ const Sidebar = () => {
       const allTeams = memberTeams?.map((mt: any) => mt.teams).filter(Boolean) || [];
       setTeams(allTeams);
 
+      // Fetch research sessions
+      await fetchResearchSessions(authUser.id);
+
       // Fetch notifications
       await fetchNotifications(authUser.id);
+
+      // Check for offline data
+      checkOfflineData();
     };
 
     fetchData();
   }, [supabase, router]);
+
+  // Check for offline data in localStorage
+  const checkOfflineData = useCallback(() => {
+    const offlineDataStr = localStorage.getItem('tabwise_offline_data');
+    if (offlineDataStr) {
+      try {
+        const data = JSON.parse(offlineDataStr);
+        setOfflineData(data);
+      } catch (e) {
+        console.error('Error parsing offline data:', e);
+      }
+    }
+  }, []);
+
+  // Fetch research sessions
+  const fetchResearchSessions = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('research_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (data) {
+      setResearchSessions(data);
+    }
+  }, [supabase]);
 
   // Fetch notifications
   const fetchNotifications = useCallback(async (userId: string) => {
@@ -96,6 +138,37 @@ const Sidebar = () => {
       setUnreadCount(data.filter(n => !n.read).length);
     }
   }, [supabase]);
+
+  // Sync offline data
+  const syncOfflineData = useCallback(async () => {
+    if (!offlineData || !user) return;
+    
+    setIsSyncing(true);
+    try {
+      // This would be a more complex function in reality
+      // For now, we'll just clear the offline data
+      localStorage.removeItem('tabwise_offline_data');
+      setOfflineData(null);
+      
+      // Show success notification
+      const { error } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          type: 'sync',
+          payload: { message: 'Offline data synced successfully' },
+          read: false
+        });
+      
+      if (!error) {
+        await fetchNotifications(user.id);
+      }
+    } catch (error) {
+      console.error('Sync error:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [offlineData, user, supabase, fetchNotifications]);
 
   // Mark notifications as read
   const markAsRead = useCallback(async (notificationId?: number) => {
@@ -140,7 +213,7 @@ const Sidebar = () => {
         .from('teams')
         .select('id, name')
         .ilike('name', `%${query}%`)
-         .eq('visibility', 'public')
+        .eq('visibility', 'public')
         .limit(5);
 
       // Search users
@@ -150,10 +223,18 @@ const Sidebar = () => {
         .or(`name.ilike.%${query}%,full_name.ilike.%${query}%`)
         .limit(5);
 
+      // Search research sessions
+      const { data: sessions } = await supabase
+        .from('research_sessions')
+        .select('id, title')
+        .ilike('title', `%${query}%`)
+        .limit(5);
+
       setSearchResults([
         ...(posts?.map(p => ({ ...p, type: 'post' })) || []),
         ...(teams?.map(t => ({ ...t, type: 'team' })) || []),
-        ...(users?.map(u => ({ ...u, type: 'user' })) || [])
+        ...(users?.map(u => ({ ...u, type: 'user' })) || []),
+        ...(sessions?.map(s => ({ ...s, type: 'research_session' })) || [])
       ]);
     } catch (error) {
       console.error('Search error:', error);
@@ -189,6 +270,9 @@ const Sidebar = () => {
       case 'user':
         navigateTo(`/user/${item.id}`);
         break;
+      case 'research_session':
+        navigateTo(`/research/${item.id}`);
+        break;
       default:
         break;
     }
@@ -212,7 +296,7 @@ const Sidebar = () => {
               onClick={() => navigateTo('/')}
             >
               <IoMdRocket className="text-orange-500 text-2xl" />
-              <span className="ml-2 font-bold text-lg dark:text-white">Ideas</span>
+              <span className="ml-2 font-bold text-lg dark:text-white">Tabwise</span>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -253,7 +337,7 @@ const Sidebar = () => {
             onClick={() => navigateTo('/')}
           >
             <IoMdRocket className="text-orange-500 text-2xl" />
-            <span className="ml-2 font-bold text-xl dark:text-white">Ideas</span>
+            <span className="ml-2 font-bold text-xl dark:text-white">Tabwise</span>
           </div>
 
           {/* Search bar */}
@@ -267,7 +351,7 @@ const Sidebar = () => {
                 onFocus={() => setIsSearchFocused(true)}
                 onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
                 className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="Search posts, teams, users..."
+                placeholder="Search posts, teams, users, sessions..."
               />
             </form>
 
@@ -308,6 +392,15 @@ const Sidebar = () => {
                           </div>
                         </>
                       )}
+                      {item.type === 'research_session' && (
+                        <>
+                          <FiArchive className="text-purple-500 mr-2" />
+                          <div>
+                            <p className="font-medium">{item.title}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">Research Session</p>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -328,7 +421,7 @@ const Sidebar = () => {
                   }`}
                 >
                   <FiHome className="text-lg" />
-                  <span className="ml-3">Home</span>
+                  <span className="ml-3">Dashboard</span>
                 </button>
               </li>
               <li>
@@ -344,6 +437,70 @@ const Sidebar = () => {
                   <span className="ml-3">Explore</span>
                 </button>
               </li>
+              
+              {/* Research Sessions Dropdown */}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setIsSessionsDropdownOpen(!isSessionsDropdownOpen)}
+                  className={`w-full flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                    pathname.startsWith('/research') 
+                      ? 'bg-orange-50 dark:bg-gray-800 text-orange-500 dark:text-orange-400' 
+                      : 'text-gray-900 dark:text-white'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <FiArchive className="text-lg" />
+                    <span className="ml-3">Research</span>
+                  </div>
+                  {isSessionsDropdownOpen ? (
+                    <FiChevronUp className="text-gray-500" />
+                  ) : (
+                    <FiChevronDown className="text-gray-500" />
+                  )}
+                </button>
+                {isSessionsDropdownOpen && (
+                  <ul className="ml-8 mt-1 space-y-1">
+                    <li>
+                      <button
+                        onClick={() => navigateTo('/research')}
+                        className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-sm ${
+                          pathname === '/research'
+                            ? 'text-orange-500 dark:text-orange-400 font-medium'
+                            : 'text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        <span>All Sessions</span>
+                      </button>
+                    </li>
+                    {researchSessions.map((session) => (
+                      <li key={session.id}>
+                        <button
+                          onClick={() => navigateTo(`/research/${session.id}`)}
+                          className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-sm ${
+                            pathname === `/research/${session.id}`
+                              ? 'text-orange-500 dark:text-orange-400 font-medium'
+                              : 'text-gray-700 dark:text-gray-300'
+                          }`}
+                        >
+                          <span className="truncate">{session.title}</span>
+                        </button>
+                      </li>
+                    ))}
+                    <li>
+                      <button
+                        onClick={() => navigateTo('/research/new')}
+                        className="w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm"
+                      >
+                        <FiPlusCircle className="mr-2 text-sm" />
+                        New Session
+                      </button>
+                    </li>
+                  </ul>
+                )}
+              </li>
+              
+              {/* Teams Dropdown */}
               <li>
                 <button
                   type="button"
@@ -385,27 +542,28 @@ const Sidebar = () => {
                         onClick={() => navigateTo('/team/create')}
                         className="w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm"
                       >
-                        {/* <FiPlusCircle className="mr-2" />
-                        Create Team */}
+                        <FiPlusCircle className="mr-2 text-sm" />
+                        Create Team
                       </button>
                     </li>
                   </ul>
                 )}
               </li>
+              
               <li>
                 <button
-                  onClick={() => navigateTo('/messages')}
+                  onClick={() => navigateTo('/drafts')}
                   className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                    pathname === '/messages' 
+                    pathname === '/drafts' 
                       ? 'bg-orange-50 dark:bg-gray-800 text-orange-500 dark:text-orange-400' 
                       : 'text-gray-900 dark:text-white'
                   }`}
                 >
-                  <FiMessageSquare className="text-lg" />
-                  <span className="ml-3">Messages</span>
+                  <FiBook className="text-lg" />
+                  <span className="ml-3">Drafts</span>
                 </button>
               </li>
-                 <li>
+              <li>
                 <button
                   onClick={() => navigateTo('/blogs')}
                   className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${
@@ -415,7 +573,7 @@ const Sidebar = () => {
                   }`}
                 >
                   <FiActivity className="text-lg" />
-                  <span className="ml-3">blogs</span>
+                  <span className="ml-3">Blogs</span>
                 </button>
               </li>
               <li>
@@ -436,7 +594,7 @@ const Sidebar = () => {
                   )}
                 </button>
               </li>
-              {/* <li>
+              <li>
                 <button
                   onClick={() => navigateTo('/settings')}
                   className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${
@@ -448,19 +606,48 @@ const Sidebar = () => {
                   <FiSettings className="text-lg" />
                   <span className="ml-3">Settings</span>
                 </button>
-              </li> */}
+              </li>
             </ul>
 
-            {/* Create post button */}
-            <div className="p-3 mt-4">
-             <button
-  onClick={() => window.open('https://ko-fi.com/gregsea', '_blank')}
-  className="w-full bg-pink-500 hover:bg-pink-600 text-white rounded-full py-2 px-4 font-semibold flex items-center justify-center transition-colors duration-200 shadow-md"
->
-  <FiPlusCircle className="mr-2" />
-  Buy me a Ko-fi ❤️
-</button>
+            {/* Offline sync indicator */}
+            {offlineData && (
+              <div className="p-3 mt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  onClick={syncOfflineData}
+                  disabled={isSyncing}
+                  className="w-full bg-yellow-500 hover:bg-yellow-600 disabled:bg-yellow-400 text-white rounded-full py-2 px-4 font-semibold flex items-center justify-center transition-colors duration-200 shadow-md"
+                >
+                  {isSyncing ? (
+                    <>
+                      <FiUploadCloud className="mr-2 animate-pulse" />
+                      Syncing...
+                    </>
+                  ) : (
+                    <>
+                      <FiDownload className="mr-2" />
+                      Sync Offline Data
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
+            {/* Create buttons */}
+            <div className="p-3 mt-4 border-t border-gray-200 dark:border-gray-700">
+              <button
+                onClick={() => navigateTo('/research/new')}
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white rounded-full py-2 px-4 font-semibold flex items-center justify-center transition-colors duration-200 shadow-md mb-2"
+              >
+                <FiPlusCircle className="mr-2" />
+                New Research
+              </button>
+              <button
+                onClick={() => window.open('https://ko-fi.com/gregsea', '_blank')}
+                className="w-full bg-pink-500 hover:bg-pink-600 text-white rounded-full py-2 px-4 font-semibold flex items-center justify-center transition-colors duration-200 shadow-md"
+              >
+                <FiCoffee className="mr-2" />
+                Buy me a Ko-fi ❤️
+              </button>
             </div>
           </nav>
 
@@ -509,8 +696,7 @@ const Sidebar = () => {
 
       {/* Main content area */}
       <div className="md:ml-64 pt-16 md:pt-0 min-h-screen bg-gray-50 dark:bg-gray-900">
-        {/* Notification dropdown (example) */}
-        {/* You can implement a proper dropdown component here */}
+        {/* Content will be rendered here */}
       </div>
     </>
   );
