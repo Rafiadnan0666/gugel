@@ -3,13 +3,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { IResearchSession, ITab, IDraft, ISummary } from '@/types/main.db';
+import type { IResearchSession, ITab, IDraft, ISummary, ISessionMessage } from '@/types/main.db';
 import {
   FiPlus, FiEdit2, FiTrash2, FiSave, FiCopy, FiDownload,
   FiExternalLink, FiZap, FiCpu, FiBook, FiLink, FiClock,
   FiUser, FiMessageSquare, FiRefreshCw, FiChevronDown,
   FiChevronUp, FiSearch, FiFilter, FiShare2, FiBookmark,
-  FiSend, FiX, FiCheck, FiEdit3, FiMoreVertical, FiAlertCircle
+  FiSend, FiX, FiCheck, FiEdit3, FiMoreVertical, FiAlertCircle,
+  FiThumbsUp, FiThumbsDown, FiStar, FiInfo
 } from 'react-icons/fi';
 
 interface AISuggestion {
@@ -22,6 +23,19 @@ interface AIChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  id?: string;
+}
+
+interface UserInterest {
+  topic: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+interface TabSuggestion {
+  url: string;
+  title: string;
+  reason: string;
+  relevance: number;
 }
 
 interface ModalProps {
@@ -37,22 +51,27 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, actionB
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-md w-full">
-        <div className="p-6 border-b border-gray-200">
+      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <FiX className="w-5 h-5" />
+          </button>
         </div>
         <div className="p-6">
           {children}
         </div>
-        <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-          >
-            Cancel
-          </button>
-          {actionButton}
-        </div>
+        {actionButton && (
+          <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            {actionButton}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -69,6 +88,7 @@ export default function SessionPage() {
   const [tabs, setTabs] = useState<ITab[]>([]);
   const [drafts, setDrafts] = useState<IDraft[]>([]);
   const [summaries, setSummaries] = useState<ISummary[]>([]);
+  const [sessionMessages, setSessionMessages] = useState<ISessionMessage[]>([]);
   const [currentDraft, setCurrentDraft] = useState('');
   const [draftVersion, setDraftVersion] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -85,6 +105,11 @@ export default function SessionPage() {
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [modal, setModal] = useState<{ type: string; data?: any }>({ type: '' });
   const [selectedTabsToImport, setSelectedTabsToImport] = useState<Set<number>>(new Set());
+  const [userInterests, setUserInterests] = useState<UserInterest[]>([]);
+  const [tabSuggestions, setTabSuggestions] = useState<TabSuggestion[]>([]);
+  const [isEditingInterests, setIsEditingInterests] = useState(false);
+  const [newInterest, setNewInterest] = useState('');
+  const [newInterestPriority, setNewInterestPriority] = useState<'high' | 'medium' | 'low'>('medium');
 
   useEffect(() => {
     loadSessionData();
@@ -139,6 +164,24 @@ export default function SessionPage() {
         .select('*')
         .in('tab_id', tabsData?.map(tab => tab.id) || []);
 
+      const { data: messagesData } = await supabase
+        .from('session_messages')
+        .select('*')
+        .eq('session_id', sessionId)
+        .order('created_at', { ascending: true });
+
+      // Load user interests from localStorage or settings
+      const savedInterests = localStorage.getItem(`userInterests-${user.id}`);
+      if (savedInterests) {
+        setUserInterests(JSON.parse(savedInterests));
+      } else {
+        // Default interests based on session title or content
+        const defaultInterests = sessionData?.title 
+          ? [{ topic: sessionData.title.split(' ')[0], priority: 'high' as const }]
+          : [{ topic: 'research', priority: 'medium' as const }];
+        setUserInterests(defaultInterests);
+      }
+
       if (sessionData) {
         setSession(sessionData);
         setEditedTitle(sessionData.title);
@@ -152,9 +195,24 @@ export default function SessionPage() {
         }
       }
       if (summariesData) setSummaries(summariesData);
+      if (messagesData) {
+        setSessionMessages(messagesData);
+        // Load today's chat messages
+        const today = new Date().toDateString();
+        const todayMessages = messagesData
+          .filter(msg => new Date(msg.created_at).toDateString() === today)
+          .map(msg => ({
+            role: msg.sender as 'user' | 'assistant',
+            content: msg.content,
+            timestamp: new Date(msg.created_at),
+            id: msg.id
+          }));
+        setChatMessages(todayMessages);
+      }
 
       if (tabsData && tabsData.length > 0) {
         generateInitialAISuggestions(tabsData, summariesData || []);
+        generateTabSuggestions(tabsData, userInterests);
       }
 
     } catch (error) {
@@ -163,124 +221,182 @@ export default function SessionPage() {
       setLoading(false);
     }
   };
-const checkAIAvailability = async () => {
-  try {
-    if (typeof window.LanguageModel !== "undefined") {
-      const opts = { expectedOutputs: [{ type: "text", languages: ["en"] }] };
-      const availability = await window.LanguageModel.availability(opts);
 
-      // ✅ handle actual statuses
-      return availability === "available" || availability === "downloadable" || availability === "readily";
-    } else if (typeof window.ai !== "undefined") {
-      return true; // old API fallback
-    }
-    return false;
-  } catch (error) {
-    console.warn("AI not available:", error);
-    return false;
-  }
-};
+  const generateTabSuggestions = async (tabs: ITab[], interests: UserInterest[]) => {
+    try {
+      const isAIAvailable = await checkAIAvailability();
+      if (!isAIAvailable) return;
 
-const createAISession = async () => {
-  try {
-    if (typeof window.LanguageModel !== 'undefined') {
-      const opts = {
-        expectedOutputs: [{ type: "text", languages: ["en"] }],
-        monitor(m: any) {
-          m.addEventListener("downloadprogress", (e: any) => {
-            console.log(`📥 Download progress: ${(e.loaded * 100).toFixed(1)}%`);
-          });
-          m.addEventListener("statechange", (e: any) => {
-            console.log("⚡ State change:", e.target.state);
-          });
-        }
-      };
+      const highPriorityInterests = interests
+        .filter(i => i.priority === 'high')
+        .map(i => i.topic);
+      
+      const prompt = `
+        Based on these research tabs and user interests, suggest 3-5 additional resources or topics to explore.
+        
+        CURRENT TABS:
+        ${tabs.map(t => `- ${t.title}: ${t.url}`).join('\n')}
+        
+        USER INTERESTS (high priority):
+        ${highPriorityInterests.join(', ')}
+        
+        Provide suggestions in this format:
+        URL: https://example.com/relevant-resource
+        TITLE: Relevant Resource Title
+        REASON: Why this is relevant to the user's research
+        RELEVANCE: 0.85 (score between 0-1)
+        
+        Focus on academic resources, recent publications, and complementary perspectives.
+      `;
 
-      const availability = await window.LanguageModel.availability(opts);
-      console.log("AI availability:", availability);
-
-      if (availability === "unavailable") {
-        throw new Error("❌ Model is unavailable");
+      const session = await createAISession();
+      let result;
+      if (typeof window.LanguageModel !== 'undefined') {
+        result = await session.prompt(prompt);
+      } else if (typeof window.ai !== 'undefined') {
+        const response = await session.prompt(prompt);
+        result = await response.text();
+      } else {
+        return;
       }
 
-      const session = await window.LanguageModel.create(opts);
-      console.log("✅ AI session ready:", session);
-      return session;
-    } else if (typeof window.ai !== 'undefined') {
-      // Fallback to older AI API
-      console.log("Using older AI API");
-      return {
-        prompt: async (text: string) => {
-          return window.ai!.prompt(text, { signal: AbortSignal.timeout(30000) });
+      const suggestions: TabSuggestion[] = [];
+      const lines = result.split('\n');
+      let currentSuggestion: Partial<TabSuggestion> = {};
+
+      for (const line of lines) {
+        if (line.startsWith('URL:')) {
+          if (currentSuggestion.url) suggestions.push(currentSuggestion as TabSuggestion);
+          currentSuggestion = { url: line.replace('URL:', '').trim() };
+        } else if (line.startsWith('TITLE:')) {
+          currentSuggestion.title = line.replace('TITLE:', '').trim();
+        } else if (line.startsWith('REASON:')) {
+          currentSuggestion.reason = line.replace('REASON:', '').trim();
+        } else if (line.startsWith('RELEVANCE:')) {
+          currentSuggestion.relevance = parseFloat(line.replace('RELEVANCE:', '').trim());
         }
-      };
-    }
-    throw new Error("No AI API available");
-  } catch (error) {
-    console.error('Error creating AI session:', error);
-    throw error;
-  }
-};
+      }
 
-const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[]) => {
-  setIsGeneratingAI(true);
-  try {
-    const isAIAvailable = await checkAIAvailability();
-    if (!isAIAvailable) {
+      if (currentSuggestion.url) {
+        suggestions.push(currentSuggestion as TabSuggestion);
+      }
+
+      setTabSuggestions(suggestions.slice(0, 5));
+    } catch (error) {
+      console.warn('Failed to generate tab suggestions:', error);
+    }
+  };
+
+  const checkAIAvailability = async () => {
+    try {
+      if (typeof window.LanguageModel !== "undefined") {
+        const opts = { expectedOutputs: [{ type: "text", languages: ["en"] }] };
+        const availability = await window.LanguageModel.availability(opts);
+        return availability === "available" || availability === "downloadable" || availability === "readily";
+      } else if (typeof window.ai !== "undefined") {
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.warn("AI not available:", error);
+      return false;
+    }
+  };
+
+  const createAISession = async () => {
+    try {
+      if (typeof window.LanguageModel !== 'undefined') {
+        const opts = {
+          expectedOutputs: [{ type: "text", languages: ["en"] }],
+          monitor(m: any) {
+            m.addEventListener("downloadprogress", (e: any) => {
+              console.log(`Download progress: ${(e.loaded * 100).toFixed(1)}%`);
+            });
+            m.addEventListener("statechange", (e: any) => {
+              console.log("State change:", e.target.state);
+            });
+          }
+        };
+
+        const availability = await window.LanguageModel.availability(opts);
+        if (availability === "unavailable") {
+          throw new Error("Model is unavailable");
+        }
+
+        return await window.LanguageModel.create(opts);
+      } else if (typeof window.ai !== 'undefined') {
+        return {
+          prompt: async (text: string) => {
+            return window.ai!.prompt(text, { signal: AbortSignal.timeout(30000) });
+          }
+        };
+      }
+      throw new Error("No AI API available");
+    } catch (error) {
+      console.error('Error creating AI session:', error);
+      throw error;
+    }
+  };
+
+  const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[]) => {
+    setIsGeneratingAI(true);
+    try {
+      const isAIAvailable = await checkAIAvailability();
+      if (!isAIAvailable) {
+        setModal({
+          type: 'ai-unavailable',
+          data: { message: 'AI features are not available in your browser.' }
+        });
+        return;
+      }
+
+      const tabContents = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
+      const summaryContents = summaries.map(s => s.summary).join('\n\n');
+
+      const prompt = `
+        Analyze this research session content and provide insights:
+
+        RESEARCH TABS:
+        ${tabContents.substring(0, 4000)}
+
+        EXISTING SUMMARIES:
+        ${summaryContents.substring(0, 2000)}
+
+        Provide 3-5 insights in this format:
+        TYPE: SUMMARY|ANALYSIS|CONNECTION|SUGGESTION|OUTLINE
+        CONFIDENCE: 0.8
+        CONTENT: Your insight here
+
+        Focus on:
+        - Key themes and patterns across the research
+        - Research gaps and unanswered questions
+        - Potential connections between different sources
+        - Next steps for the research
+        - Content organization and structure suggestions
+        - Outline for a research paper based on this content
+      `;
+
+      const session = await createAISession();
+      
+      let result;
+      if (typeof window.LanguageModel !== 'undefined') {
+        result = await session.prompt(prompt);
+      } else {
+        const response = await session.prompt(prompt);
+        result = await response.text();
+      }
+      
+      parseAISuggestions(result);
+    } catch (error) {
+      console.warn('AI suggestion generation failed:', error);
       setModal({
-        type: 'ai-unavailable',
-        data: { message: 'AI features are not available in your browser.' }
+        type: 'error',
+        data: { message: 'Failed to generate AI suggestions. Please try again.' }
       });
-      return;
+    } finally {
+      setIsGeneratingAI(false);
     }
-
-     const tabContents = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
-    const summaryContents = summaries.map(s => s.summary).join('\n\n');
-
-    const prompt = `
-      Analyze this research session content and provide insights:
-
-      RESEARCH TABS:
-      ${tabContents.substring(0, 4000)}
-
-      EXISTING SUMMARIES:
-      ${summaryContents.substring(0, 2000)}
-
-      Provide 3-5 insights in this format:
-      TYPE: SUMMARY|ANALYSIS|CONNECTION|SUGGESTION|OUTLINE
-      CONFIDENCE: 0.8
-      CONTENT: Your insight here
-
-      Focus on:
-      - Key themes and patterns across the research
-      - Research gaps and unanswered questions
-      - Potential connections between different sources
-      - Next steps for the research
-      - Content organization and structure suggestions
-      - Outline for a research paper based on this content
-    `;
-
-    const session = await createAISession();
-    
-    let result;
-    if (typeof window.LanguageModel !== 'undefined') {
-      result = await session.prompt(prompt);
-    } else {
-      const response = await session.prompt(prompt);
-      result = await response.text();
-    }
-    
-    parseAISuggestions(result);
-  } catch (error) {
-    console.warn('AI suggestion generation failed:', error);
-    setModal({
-      type: 'error',
-      data: { message: 'Failed to generate AI suggestions. Please try again.' }
-    });
-  } finally {
-    setIsGeneratingAI(false);
-  }
-};
+  };
 
   const parseAISuggestions = (text: string) => {
     const suggestions: AISuggestion[] = [];
@@ -309,7 +425,7 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
       suggestions.push(currentSuggestion as AISuggestion);
     }
     
-    // If no suggestions were parsed, create some fallback ones
+    // Fallback suggestions if parsing failed
     if (suggestions.length === 0) {
       suggestions.push(
         {
@@ -691,6 +807,7 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
       const tabContext = tabs.map(tab => `TITLE: ${tab.title}\nURL: ${tab.url}\nCONTENT: ${tab.content || ''}`).join('\n\n');
       const summaryContext = summaries.map(s => s.summary).join('\n\n');
       const draftContext = drafts.length > 0 ? drafts[0].content.substring(0, 1000) : '';
+      const interestsContext = userInterests.map(i => `${i.topic} (${i.priority})`).join(', ');
 
       const prompt = `
         You are a research assistant helping with a research session. 
@@ -704,9 +821,13 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
         CURRENT DRAFT:
         ${draftContext}
         
+        USER INTERESTS:
+        ${interestsContext}
+        
         USER QUESTION: ${chatInput}
         
         Provide a helpful, focused response based on the research content. Be specific and reference the available research materials when possible.
+        Consider the user's interests when formulating your response.
       `;
 
       const session = await createAISession();
@@ -726,6 +847,26 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
       };
       
       setChatMessages(prev => [...prev, aiMessage]);
+      
+      // Save message to database
+      const { data: userData } = await supabase.auth.getUser();
+      if (userData.user) {
+        await supabase
+          .from('session_messages')
+          .insert([
+            {
+              session_id: sessionId,
+              user_id: userData.user.id,
+              content: chatInput,
+              sender: 'user'
+            },
+            {
+              session_id: sessionId,
+              content: text,
+              sender: 'ai'
+            }
+          ]);
+      }
     } catch (error) {
       console.error('Chat error:', error);
       
@@ -765,6 +906,7 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
       if (newTabs.length > 0) {
         setTabs(prev => [...newTabs, ...prev]);
         generateInitialAISuggestions([...newTabs, ...tabs], summaries);
+        generateTabSuggestions([...newTabs, ...tabs], userInterests);
       }
       
       setShowImportDialog(false);
@@ -800,6 +942,50 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
     }
   };
 
+  const addInterest = async () => {
+    if (newInterest.trim()) {
+      const newInterests = [...userInterests, { topic: newInterest.trim(), priority: newInterestPriority }];
+      setUserInterests(newInterests);
+      
+      // Save to localStorage
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        localStorage.setItem(`userInterests-${user.id}`, JSON.stringify(newInterests));
+      }
+      
+      setNewInterest('');
+      setNewInterestPriority('medium');
+      generateTabSuggestions(tabs, newInterests);
+    }
+  };
+
+  const removeInterest = async (index: number) => {
+    const newInterests = userInterests.filter((_, i) => i !== index);
+    setUserInterests(newInterests);
+    
+    // Save to localStorage
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      localStorage.setItem(`userInterests-${user.id}`, JSON.stringify(newInterests));
+    }
+    
+    generateTabSuggestions(tabs, newInterests);
+  };
+
+  const updateInterestPriority = async (index: number, priority: 'high' | 'medium' | 'low') => {
+    const newInterests = [...userInterests];
+    newInterests[index].priority = priority;
+    setUserInterests(newInterests);
+    
+    // Save to localStorage
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      localStorage.setItem(`userInterests-${user.id}`, JSON.stringify(newInterests));
+    }
+    
+    generateTabSuggestions(tabs, newInterests);
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -831,6 +1017,7 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
 
       if (data) {
         setTabs(prev => [data, ...prev]);
+        generateTabSuggestions([data, ...tabs], userInterests);
         setModal({
           type: 'success',
           data: { message: 'Tab added successfully!' }
@@ -841,6 +1028,39 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
       setModal({
         type: 'error',
         data: { message: 'Failed to add tab. Please try again.' }
+      });
+    }
+  };
+
+  const addSuggestedTab = async (suggestion: TabSuggestion) => {
+    try {
+      const { data } = await supabase
+        .from('tabs')
+        .insert([{
+          session_id: sessionId,
+          url: suggestion.url,
+          title: suggestion.title,
+          content: `Suggested based on your interests: ${suggestion.reason}`
+        }])
+        .select()
+        .single();
+
+      if (data) {
+        setTabs(prev => [data, ...prev]);
+        generateTabSuggestions([data, ...tabs], userInterests);
+        setModal({
+          type: 'success',
+          data: { message: 'Suggested tab added successfully!' }
+        });
+        
+        // Remove this suggestion from the list
+        setTabSuggestions(prev => prev.filter(s => s.url !== suggestion.url));
+      }
+    } catch (error) {
+      console.error('Error adding suggested tab:', error);
+      setModal({
+        type: 'error',
+        data: { message: 'Failed to add suggested tab. Please try again.' }
       });
     }
   };
@@ -992,7 +1212,7 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
         {activeTab === 'content' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Tabs List */}
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold text-gray-900">Research Tabs</h2>
                 <div className="flex items-center space-x-2">
@@ -1096,10 +1316,131 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
                   );
                 })
               )}
+
+              {/* Tab Suggestions */}
+              {tabSuggestions.length > 0 && (
+                <div className="mt-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Suggested Resources</h3>
+                    <FiInfo className="w-4 h-4 text-gray-500" title="Based on your interests and current research" />
+                  </div>
+                  <div className="space-y-3">
+                    {tabSuggestions.map((suggestion, index) => (
+                      <div key={index} className="border border-gray-200 rounded-lg p-4 bg-blue-50">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900">{suggestion.title}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{suggestion.url}</p>
+                            <p className="text-sm text-gray-700 mt-2">{suggestion.reason}</p>
+                            <div className="flex items-center mt-2">
+                              <span className="text-xs text-gray-500">Relevance: {(suggestion.relevance * 100).toFixed(0)}%</span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => addSuggestedTab(suggestion)}
+                            className="ml-4 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Quick Actions & AI */}
             <div className="space-y-6">
+              {/* User Interests */}
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900">Research Interests</h3>
+                  <button
+                    onClick={() => setIsEditingInterests(!isEditingInterests)}
+                    className="text-blue-600 hover:text-blue-800 text-sm"
+                  >
+                    {isEditingInterests ? 'Done' : 'Edit'}
+                  </button>
+                </div>
+                
+                {isEditingInterests ? (
+                  <div className="space-y-4">
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        value={newInterest}
+                        onChange={(e) => setNewInterest(e.target.value)}
+                        placeholder="Add a research interest"
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:border-black focus:outline-none"
+                      />
+                      <select
+                        value={newInterestPriority}
+                        onChange={(e) => setNewInterestPriority(e.target.value as 'high' | 'medium' | 'low')}
+                        className="border border-gray-300 rounded-lg px-3 py-2 focus:border-black focus:outline-none"
+                      >
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                      </select>
+                      <button
+                        onClick={addInterest}
+                        disabled={!newInterest.trim()}
+                        className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {userInterests.map((interest, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <span className="font-medium">{interest.topic}</span>
+                          <div className="flex items-center space-x-2">
+                            <select
+                              value={interest.priority}
+                              onChange={(e) => updateInterestPriority(index, e.target.value as 'high' | 'medium' | 'low')}
+                              className="text-xs border border-gray-300 rounded px-2 py-1"
+                            >
+                              <option value="high">High</option>
+                              <option value="medium">Medium</option>
+                              <option value="low">Low</option>
+                            </select>
+                            <button
+                              onClick={() => removeInterest(index)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <FiX className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {userInterests.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No interests added yet</p>
+                    ) : (
+                      userInterests.map((interest, index) => (
+                        <span
+                          key={index}
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            interest.priority === 'high'
+                              ? 'bg-red-100 text-red-800'
+                              : interest.priority === 'medium'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}
+                        >
+                          {interest.topic}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* AI Draft Generator */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                 <div className="flex items-center space-x-3 mb-4">
@@ -1183,6 +1524,10 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
                   <div className="flex justify-between">
                     <span className="text-gray-600">Drafts Created</span>
                     <span className="font-medium">{drafts.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Chat Messages</span>
+                    <span className="font-medium">{sessionMessages.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Last Updated</span>
@@ -1306,6 +1651,17 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
                         Use this outline
                       </button>
                     )}
+                    
+                    <div className="mt-3 flex space-x-2">
+                      <button className="text-gray-500 hover:text-blue-600 flex items-center text-sm">
+                        <FiThumbsUp className="w-4 h-4 mr-1" />
+                        Helpful
+                      </button>
+                      <button className="text-gray-500 hover:text-blue-600 flex items-center text-sm">
+                        <FiThumbsDown className="w-4 h-4 mr-1" />
+                        Not helpful
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1394,6 +1750,11 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
                 <h2 className="text-xl font-semibold text-gray-900">AI Research Assistant</h2>
               </div>
               <p className="text-gray-600 mt-2">Ask questions about your research and get AI-powered insights.</p>
+              
+              <div className="mt-4 flex items-center text-sm text-gray-500">
+                <FiInfo className="w-4 h-4 mr-1" />
+                <span>Only todays messages are shown here. All messages are saved to your session.</span>
+              </div>
             </div>
 
             <div className="h-96 overflow-y-auto p-6 space-y-4">
@@ -1644,4 +2005,3 @@ const generateInitialAISuggestions = async (tabs: ITab[], summaries: ISummary[])
     </Layout>
   );
 }
-
