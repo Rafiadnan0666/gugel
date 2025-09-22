@@ -24,6 +24,7 @@ interface AIChatMessage {
   content: string;
   timestamp: Date;
   id?: string;
+  profile?: { full_name?: string; avatar_url?: string; };
 }
 
 interface UserInterest {
@@ -110,6 +111,9 @@ export default function SessionPage() {
   const [isEditingInterests, setIsEditingInterests] = useState(false);
   const [newInterest, setNewInterest] = useState('');
   const [newInterestPriority, setNewInterestPriority] = useState<'high' | 'medium' | 'low'>('medium');
+  const [collaborators, setCollaborators] = useState<any[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
 
   useEffect(() => {
     loadSessionData();
@@ -121,6 +125,66 @@ export default function SessionPage() {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages, activeTab]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const channel = supabase
+      .channel(`session-chat:${sessionId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'session_messages', filter: `session_id=eq.${sessionId}` }, 
+        async (payload) => {
+          const newMessageId = payload.new.id;
+          const { data: newMessage } = await supabase
+            .from('session_messages')
+            .select('*, profile:profiles(full_name, avatar_url)')
+            .eq('id', newMessageId)
+            .single();
+
+          if (newMessage) {
+            setChatMessages(prev => [...prev, {
+                role: newMessage.sender as 'user' | 'assistant',
+                content: newMessage.content,
+                timestamp: new Date(newMessage.created_at),
+                id: newMessage.id,
+                profile: newMessage.profile
+            }]);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || !userProfile) return;
+
+    const channel = supabase.channel(`session-presence:${sessionId}`, {
+      config: {
+        presence: {
+          key: userProfile.id,
+        },
+      },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const newState = channel.presenceState();
+        const users = Object.values(newState).map((p: any) => p[0]);
+        setOnlineUsers(users);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ user_id: userProfile.id, name: userProfile.full_name || userProfile.email });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sessionId, userProfile]);
 
   const detectChromeTabs = () => {
     // Simulate Chrome tabs detection for web environment
@@ -141,11 +205,59 @@ export default function SessionPage() {
         return;
       }
 
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      setUserProfile(profile);
+
+      const { data: collaboratorsData } = await supabase
+        .from('session_collaborators')
+        .select('*, profile:profiles(full_name, avatar_url)')
+        .eq('session_id', sessionId);
+      if (collaboratorsData) setCollaborators(collaboratorsData);
+
       const { data: sessionData } = await supabase
         .from('research_sessions')
         .select('*')
         .eq('id', sessionId)
         .single();
+
+      if (!sessionData) {
+        router.push('/dashboard');
+        return;
+      }
+
+      if (sessionData.user_id !== user.id) {
+        // Check for collaboration
+        const { data: collaborator } = await supabase
+          .from('session_collaborators')
+          .select('id')
+          .eq('session_id', sessionId)
+          .eq('user_id', user.id)
+          .single();
+
+        if (!collaborator) {
+          // Check for team membership if session belongs to a team
+          if (sessionData.team_id) {
+            const { data: teamMember } = await supabase
+              .from('team_members')
+              .select('id')
+              .eq('team_id', sessionData.team_id)
+              .eq('user_id', user.id)
+              .single();
+
+            if (!teamMember) {
+              router.push('/dashboard');
+              return;
+            }
+          } else {
+            router.push('/dashboard');
+            return;
+          }
+        }
+      }
 
       const { data: tabsData } = await supabase
         .from('tabs')
@@ -166,7 +278,7 @@ export default function SessionPage() {
 
       const { data: messagesData } = await supabase
         .from('session_messages')
-        .select('*')
+        .select('*, profile:profiles(full_name, avatar_url)')
         .eq('session_id', sessionId)
         .order('created_at', { ascending: true });
 
@@ -198,16 +310,15 @@ export default function SessionPage() {
       if (messagesData) {
         setSessionMessages(messagesData);
         // Load today's chat messages
-        const today = new Date().toDateString();
-        const todayMessages = messagesData
-          .filter(msg => new Date(msg.created_at).toDateString() === today)
+        const allMessages = messagesData
           .map(msg => ({
             role: msg.sender as 'user' | 'assistant',
             content: msg.content,
             timestamp: new Date(msg.created_at),
-            id: msg.id
+            id: msg.id,
+            profile: msg.profile
           }));
-        setChatMessages(todayMessages);
+        setChatMessages(allMessages);
       }
 
       if (tabsData && tabsData.length > 0) {
@@ -809,8 +920,13 @@ export default function SessionPage() {
       const draftContext = drafts.length > 0 ? drafts[0].content.substring(0, 1000) : '';
       const interestsContext = userInterests.map(i => `${i.topic} (${i.priority})`).join(', ');
 
+      const collaboratorsNames = collaborators.map(c => c.profile.full_name).join(', ');
+      const userName = userProfile?.full_name || 'the user';
+
       const prompt = `
         You are a research assistant helping with a research session. 
+        The current user is ${userName}.
+        The other collaborators in this session are: ${collaboratorsNames}.
         
         RESEARCH CONTEXT:
         ${tabContext.substring(0, 3000)}
@@ -827,7 +943,8 @@ export default function SessionPage() {
         USER QUESTION: ${chatInput}
         
         Provide a helpful, focused response based on the research content. Be specific and reference the available research materials when possible.
-        Consider the user's interests when formulating your response.
+        Address the user by their name, ${userName}.
+        Consider the user's interests and the collaborative nature of the session when formulating your response.
       `;
 
       const session = await createAISession();
@@ -1150,7 +1267,14 @@ export default function SessionPage() {
             </p>
           </div>
           
-          <div className="flex space-x-3">
+          <div className="flex items-center space-x-3">
+            <div className="flex -space-x-2 overflow-hidden">
+              {onlineUsers.map((user) => (
+                <div key={user.user_id} title={user.name} className="w-8 h-8 rounded-full ring-2 ring-white bg-blue-500 flex items-center justify-center text-white font-bold text-sm">
+                  {user.name ? user.name.charAt(0).toUpperCase() : '?'}
+                </div>
+              ))}
+            </div>
             <button 
               onClick={shareSession}
               className="bg-gray-100 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
@@ -1802,8 +1926,13 @@ export default function SessionPage() {
                 chatMessages.map((message, index) => (
                   <div
                     key={index}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
+                    {message.role !== 'user' && (
+                      <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center font-bold text-white">
+                        {message.profile ? message.profile.full_name?.charAt(0) : 'A'}
+                      </div>
+                    )}
                     <div
                       className={`max-w-3/4 rounded-lg p-4 ${
                         message.role === 'user'
@@ -1811,6 +1940,9 @@ export default function SessionPage() {
                           : 'bg-gray-100 text-gray-900'
                       }`}
                     >
+                      {message.profile && message.role !== 'user' && (
+                        <p className="font-bold text-sm mb-1">{message.profile.full_name || 'User'}</p>
+                      )}
                       <p className="whitespace-pre-wrap">{message.content}</p>
                       <p className="text-xs mt-2 opacity-70">
                         {message.timestamp.toLocaleTimeString()}

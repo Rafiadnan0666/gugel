@@ -481,17 +481,60 @@ export default function TeamPage({ params }: TeamPageProps) {
   }
 
   if (!isMember) {
+    if (team && team.visibility === 'public') {
+      // For public teams, show a public view
+      return (
+        <Layout>
+          <div className="flex flex-col h-full bg-gray-50">
+            <div className="bg-white p-6 border-b border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                    <FiUsers className="text-2xl text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-gray-900">{team.name}</h1>
+                    <p className="text-gray-600 flex items-center flex-wrap gap-2">
+                      <span className="flex items-center px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full">
+                        <FiGlobe className="mr-1" /> Public Team
+                      </span>
+                      <span className="flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
+                        <FiUsers className="mr-1" /> {teamMembers.length} member{teamMembers.length !== 1 ? 's' : ''}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { /* TODO: Implement request to join */ toast.success('Request to join sent!'); }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                >
+                  <FiUserPlus className="mr-2" /> Request to Join
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 p-6 overflow-auto">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">About this team</h3>
+                <p className="text-gray-600">{team.description || 'No description provided.'}</p>
+              </div>
+            </div>
+          </div>
+        </Layout>
+      );
+    }
+
+    // For private teams, show restricted message
     return (
       <Layout>
         <div className="p-8 text-center">
           <FiLock className="mx-auto text-4xl text-gray-400 mb-4" />
-          <h1 className="text-2xl font-bold text-gray-800">Restricted Area</h1>
-          <p className="text-gray-600 mt-2">You're not a member of this team. Please request access from a team admin.</p>
+          <h1 className="text-2xl font-bold text-gray-800">Private Team</h1>
+          <p className="text-gray-600 mt-2">You must be a member to view this team.</p>
           <button 
-            onClick={() => router.push('/teams')}
+            onClick={() => router.push('/dashboard')}
             className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
-            Back to Teams
+            Back to Dashboard
           </button>
         </div>
       </Layout>

@@ -11,6 +11,7 @@ export interface IProfile {
 export interface IResearchSession {
   id: string;
   user_id: string; 
+  team_id?: string;
   title: string;
   created_at: Date;
 }
