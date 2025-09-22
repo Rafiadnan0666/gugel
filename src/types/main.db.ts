@@ -31,7 +31,6 @@ export interface ITab {
   content?: string;
   created_at: Date;
 }
-
 export interface ISummary {
   id: string;
   tab_id: string;
