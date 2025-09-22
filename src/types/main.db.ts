@@ -62,6 +62,7 @@ export interface ITeam {
   id: string;
   name: string;
   description?: string;
+  visibility ?: "private" | "public";
   owner_id: string;
   created_at: Date;
 }

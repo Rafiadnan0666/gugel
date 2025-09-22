@@ -569,7 +569,7 @@ Focus on actionable insights that would help the researcher move forward.`;
                       >
                         <h3 className="font-medium text-gray-900 truncate">{session.title}</h3>
                         <p className="text-sm text-gray-600">
-                          Created {formatDate(session.ToString().created_at)}
+                          Created {formatDate(session.created_at)}
                           {session.tags && session.tags.length > 0 && (
                             <span className="ml-2">
                               {session.tags.map(tag => (
