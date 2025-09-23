@@ -86,12 +86,23 @@ const checkAIAvailability = async () => {
         return;
       }
 
-      // Load all data in parallel for better performance
-      const [sessionsResult, tabsResult, draftsResult] = await Promise.all([
-        supabase.from('research_sessions').select('*').order('created_at', { ascending: false }),
-        supabase.from('tabs').select('*'),
-        supabase.from('drafts').select('*').order('created_at', { ascending: false }).limit(3)
+      // Load user-specific data
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from('research_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (sessionsError) throw sessionsError;
+
+      const sessionIds = sessionsData ? sessionsData.map(s => s.id) : [];
+
+      const [tabsResult, draftsResult] = await Promise.all([
+        sessionIds.length > 0 ? supabase.from('tabs').select('*').in('session_id', sessionIds) : Promise.resolve({ data: [] }),
+        sessionIds.length > 0 ? supabase.from('drafts').select('*').in('session_id', sessionIds).order('created_at', { ascending: false }).limit(3) : Promise.resolve({ data: [] })
       ]);
+
+      const sessionsResult = { data: sessionsData };
 
       if (sessionsResult.data) {
         setSessions(sessionsResult.data);

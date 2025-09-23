@@ -11,6 +11,7 @@ export interface IProfile {
 export interface IResearchSession {
   id: string;
   user_id: string; 
+  team_id?: string;
   title: string;
   created_at: Date;
 }
@@ -31,7 +32,6 @@ export interface ITab {
   content?: string;
   created_at: Date;
 }
-
 export interface ISummary {
   id: string;
   tab_id: string;
