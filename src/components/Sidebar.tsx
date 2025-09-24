@@ -26,7 +26,7 @@ import { createClient } from '@/utils/supabase/client';
 import { IoMdRocket } from "react-icons/io";
 import { RiCompassDiscoverLine } from "react-icons/ri";
 import { debounce } from 'lodash';
-import type {  IResearchSession } from '@/types/main.db';
+import type {  IProfile, IResearchSession,ITeam, } from '@/types/main.db';
 
 const Sidebar = () => {
   const router = useRouter();
@@ -40,11 +40,50 @@ const Sidebar = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [user, setUser] = useState<IUser | null>(null);
+  const [user, setUser] = useState<IProfile | null>(null);
   const [notifications, setNotifications] = useState<INotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [offlineData, setOfflineData] = useState<any>(null);
+
+  const checkOfflineData = useCallback(() => {
+    const offlineDataStr = localStorage.getItem('tabwise_offline_data');
+    if (offlineDataStr) {
+      try {
+        const data = JSON.parse(offlineDataStr);
+        setOfflineData(data);
+      } catch (e) {
+        console.error('Error parsing offline data:', e);
+      }
+    }
+  }, []);
+
+  const fetchResearchSessions = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('research_sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (data) {
+      setResearchSessions(data);
+    }
+  }, [supabase]);
+
+  const fetchNotifications = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (data) {
+      setNotifications(data);
+      setUnreadCount(data.filter(n => !n.read).length);
+    }
+  }, [supabase]);
 
   // Fetch user data, teams, and research sessions
   useEffect(() => {
@@ -95,49 +134,7 @@ const Sidebar = () => {
     };
 
     fetchData();
-  }, [supabase, router]);
-
-  // Check for offline data in localStorage
-  const checkOfflineData = useCallback(() => {
-    const offlineDataStr = localStorage.getItem('tabwise_offline_data');
-    if (offlineDataStr) {
-      try {
-        const data = JSON.parse(offlineDataStr);
-        setOfflineData(data);
-      } catch (e) {
-        console.error('Error parsing offline data:', e);
-      }
-    }
-  }, []);
-
-  // Fetch research sessions
-  const fetchResearchSessions = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('research_sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (data) {
-      setResearchSessions(data);
-    }
-  }, [supabase]);
-
-  // Fetch notifications
-  const fetchNotifications = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (data) {
-      setNotifications(data);
-      setUnreadCount(data.filter(n => !n.read).length);
-    }
-  }, [supabase]);
+  }, [supabase, router, fetchResearchSessions, fetchNotifications, checkOfflineData]);
 
   // Sync offline data
   const syncOfflineData = useCallback(async () => {
@@ -193,6 +190,7 @@ const Sidebar = () => {
   }, [supabase, user, fetchNotifications]);
 
   // Search handler with debounce
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleSearch = useCallback(debounce(async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -271,7 +269,7 @@ const Sidebar = () => {
         navigateTo(`/user/${item.id}`);
         break;
       case 'research_session':
-        navigateTo(`/research/${item.id}`);
+        navigateTo(`/session/${item.id}`);
         break;
       default:
         break;
@@ -444,7 +442,7 @@ const Sidebar = () => {
                   type="button"
                   onClick={() => setIsSessionsDropdownOpen(!isSessionsDropdownOpen)}
                   className={`w-full flex items-center justify-between p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                    pathname.startsWith('/research') 
+                    pathname.startsWith('/session') 
                       ? 'bg-orange-50 dark:bg-gray-800 text-orange-500 dark:text-orange-400' 
                       : 'text-gray-900 dark:text-white'
                   }`}
@@ -476,9 +474,9 @@ const Sidebar = () => {
                     {researchSessions.map((session) => (
                       <li key={session.id}>
                         <button
-                          onClick={() => navigateTo(`/research/${session.id}`)}
+                          onClick={() => navigateTo(`/session/${session.id}`)}
                           className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-sm ${
-                            pathname === `/research/${session.id}`
+                            pathname === `/session/${session.id}`
                               ? 'text-orange-500 dark:text-orange-400 font-medium'
                               : 'text-gray-700 dark:text-gray-300'
                           }`}
