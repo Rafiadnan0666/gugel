@@ -25,6 +25,7 @@ export interface ISessionCollaborator {
 }
 
 export interface ITab {
+  favicon: string;
   id: string;
   session_id: string;
   url: string;
