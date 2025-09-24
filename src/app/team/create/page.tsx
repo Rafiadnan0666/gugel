@@ -278,7 +278,7 @@ export default function CreateTeamPage() {
                   value={newTeamData.description}
                   onChange={(e) => setNewTeamData({...newTeamData, description: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-                  placeholder="Describe the purpose of this team"
+                  placeholder="Describe your team&apos;s purpose..."
                   rows={3}
                   maxLength={200}
                   disabled={isCreating}
@@ -402,7 +402,7 @@ export default function CreateTeamPage() {
           ) : (
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
               <FiUsers className="mx-auto text-3xl text-gray-400 mb-3" />
-              <p className="text-gray-500">You haven't created any teams yet.</p>
+              <p className="text-gray-500">You haven&apos;t created any teams yet.</p>
               <button
                 onClick={() => setShowCreateForm(true)}
                 className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
@@ -416,7 +416,7 @@ export default function CreateTeamPage() {
 
         {/* Teams User is a Member Of */}
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Teams You're a Member Of</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Teams You&apos;re a Member Of</h2>
 
           {userMemberships.filter(m => m.role !== 'owner').length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -456,7 +456,7 @@ export default function CreateTeamPage() {
           ) : (
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center">
               <FiUser className="mx-auto text-3xl text-gray-400 mb-3" />
-              <p className="text-gray-500">You're not a member of any other teams.</p>
+              <p className="text-gray-500">You&apos;re not a member of any other teams.</p>
             </div>
           )}
         </div>

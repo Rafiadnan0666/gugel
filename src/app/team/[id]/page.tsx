@@ -156,7 +156,7 @@ export default function TeamPage({ params }: TeamPageProps) {
     }, 30000);
 
     return interval;
-  }, [activeTab, teamId]);
+  }, [activeTab, teamId, fetchAnalyticsData]);
 
   const fetchAnalyticsData = useCallback(async () => {
     if (!teamId) return;

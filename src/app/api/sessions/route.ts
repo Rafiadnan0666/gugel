@@ -1,0 +1,42 @@
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+
+export async function GET(request: Request) {
+  const cookieStore = cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return cookieStore.get(name)?.value;
+        },
+      },
+    }
+  );
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from('research_sessions')
+    .select('id, title')
+    .eq('user_id', user.id);
+
+  if (error) {
+    console.error('Error fetching sessions:', error);
+    return NextResponse.json({ error: 'Failed to fetch sessions' }, { status: 500 });
+  }
+
+  return NextResponse.json(data, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
