@@ -379,7 +379,7 @@ const TabModal: React.FC<{
         url,
         title: title || new URL(url).hostname,
         content,
-        favicon: editingTab?.favicon || `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`
+        // favicon: editingTab?.favicon || `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`
       });
       onClose();
     }
@@ -571,7 +571,7 @@ export default function AdvancedSessionPage() {
           url: tabData.url,
           title: tabData.title,
           content: tabData.content,
-          favicon: tabData.favicon
+          // favicon: tabData.favicon
         }])
         .select()
         .single();
@@ -664,7 +664,7 @@ export default function AdvancedSessionPage() {
       const { data, error } = await supabase
         .from('drafts')
         .insert([{
-          session_id: sessionId,
+          research_session_id: sessionId,
           content: currentDraft,
           version: draftVersion
         }])
@@ -1052,14 +1052,14 @@ export default function AdvancedSessionPage() {
                       <div key={tab.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors group">
                         <div className="flex items-start justify-between">
                           <div className="flex items-start space-x-3 flex-1 min-w-0">
-                            <img 
+                            {/* <img 
                               src={tab.favicon} 
                               alt="" 
                               className="w-6 h-6 mt-1 flex-shrink-0" 
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = '/images/default-favicon.png';
                               }}
-                            />
+                            /> */}
                             <div className="flex-1 min-w-0">
                               <h3 className="font-semibold text-gray-900 truncate">{tab.title || 'Untitled'}</h3>
                               <p className="text-sm text-gray-600 truncate">{tab.url}</p>

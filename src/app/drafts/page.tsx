@@ -5,22 +5,14 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import { FiPlus } from 'react-icons/fi';
+import { IDraft } from '@/types/main.db';
 
-interface Draft {
-  id: string;
-  content: string;
-  version: number;
-  created_at: string;
-  research_sessions: {
-    id: string;
-    title: string;
-  } | null;
-}
+
 
 export default function DraftListPage() {
   const router = useRouter();
   const supabase = createClient();
-  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [drafts, setDrafts] = useState<IDraft[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,9 +36,7 @@ export default function DraftListPage() {
         .from('drafts')
         .select(`
           id, content, version, created_at,
-          research_sessions (
-            id, title, user_id
-          )
+          research_sessions(id, title, user_id)
         `)
         .order('created_at', { ascending: false });
 
@@ -54,7 +44,10 @@ export default function DraftListPage() {
 
       // filter drafts where session.user_id == current user
       const userDrafts = (data || []).filter(
-        (draft) => draft.research_sessions?.user_id === user.id
+        (draft) =>
+          Array.isArray(draft.research_sessions) &&
+          draft.research_sessions.length > 0 &&
+          draft.research_sessions[0].user_id === user.id
       );
 
       setDrafts(userDrafts);

@@ -1070,11 +1070,11 @@ The team has ${presenceUsers.length} members online right now - perfect time for
   useEffect(() => {
     initializeTeamData();
     const cleanupPresence = setupPresenceTracking();
-    const cleanupAnalytics = startAnalyticsPolling();
+    // const cleanupAnalytics = startAnalyticsPolling();
 
     return () => {
-      if (cleanupPresence) cleanupPresence();
-      if (cleanupAnalytics) cleanupAnalytics();
+      // if (cleanupPresence) cleanupPresence();
+      // if (cleanupAnalytics) cleanupAnalytics();
     };
   }, [initializeTeamData, setupPresenceTracking, startAnalyticsPolling]);
 
