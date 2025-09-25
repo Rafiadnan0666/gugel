@@ -1,62 +1,73 @@
-document.addEventListener('DOMContentLoaded', async function() {
-  const submitButton = document.getElementById('submit');
-  const promptInput = document.getElementById('prompt');
-  const responseDiv = document.getElementById('response');
-  const statusDiv = document.getElementById('status');
-  const historyDiv = document.getElementById('history');
+document.addEventListener('DOMContentLoaded', function () {
+    const sessionSelect = document.getElementById('session');
+    const collectButton = document.getElementById('collect');
+    const statusDiv = document.getElementById('status');
 
-  // Load and display conversation history
-  chrome.storage.local.get('history', function(data) {
-    if (data.history) {
-      data.history.forEach(item => {
-        const historyItem = document.createElement('div');
-        historyItem.innerHTML = `<b>You:</b> ${item.prompt}<br><b>AI:</b> ${item.response}`;
-        historyDiv.appendChild(historyItem);
-      });
+    const API_URL = 'http://localhost:3000';
+
+    async function fetchSessions() {
+        try {
+            const response = await fetch(`${API_URL}/api/sessions`, { credentials: 'include' });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const sessions = await response.json();
+
+            if (sessions.length === 0) {
+                sessionSelect.innerHTML = '<option>No sessions found</option>';
+                collectButton.disabled = true;
+            } else {
+                sessionSelect.innerHTML = sessions.map(session => `<option value="${session.id}">${session.title}</option>`).join('');
+                collectButton.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error fetching sessions:', error);
+            statusDiv.textContent = 'Error fetching sessions. Make sure you are logged in.';
+            collectButton.disabled = true;
+        }
     }
-  });
 
-  try {
-    const sessionCheck = await chrome.ai.canCreateTextSession();
-    statusDiv.textContent = `Model availability: ${sessionCheck}`;
+    collectButton.addEventListener('click', async () => {
+        collectButton.disabled = true;
+        statusDiv.textContent = 'Collecting...';
 
-    if (sessionCheck === 'readily') {
-      submitButton.disabled = false;
-    } else {
-      submitButton.disabled = true;
-      if (sessionCheck === 'after-download') {
-        statusDiv.textContent = 'Model is being downloaded. Please wait.';
-      } else {
-        statusDiv.innerHTML = '<b>Error:</b> The chrome.ai API is not available. Please ensure you are using Chrome 127 or later and have enabled the following flags in chrome://flags:<br><ul><li>#prompt-api-for-gemini-nano</li><li>#optimization-guide-on-device-model</li></ul>';
-      }
-    }
-  } catch (error) {
-    statusDiv.textContent = 'Error: ' + error.message;
-  }
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            const sessionId = sessionSelect.value;
 
-  submitButton.addEventListener('click', async function() {
-    const prompt = promptInput.value;
-    responseDiv.textContent = 'Loading...';
+            if (!tab || !sessionId) {
+                throw new Error('Could not get tab or session ID');
+            }
 
-    try {
-      const session = await chrome.ai.createTextSession();
-      const result = await session.prompt(prompt);
-      responseDiv.textContent = result;
+            const response = await fetch(`${API_URL}/api/tabs`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    url: tab.url,
+                    title: tab.title,
+                    content: '' // Content will be fetched later
+                }),
+            });
 
-      // Save to history
-      chrome.storage.local.get('history', function(data) {
-        const history = data.history || [];
-        history.push({ prompt: prompt, response: result });
-        chrome.storage.local.set({ history: history });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to collect tab');
+            }
 
-        // Update history display
-        const historyItem = document.createElement('div');
-        historyItem.innerHTML = `<b>You:</b> ${prompt}<br><b>AI:</b> ${result}`;
-        historyDiv.appendChild(historyItem);
-      });
+            statusDiv.textContent = `Tab '${tab.title}' collected successfully!`;
+            setTimeout(() => { statusDiv.textContent = '' }, 3000);
 
-    } catch (error) {
-      responseDiv.textContent = 'Error: ' + error.message;
-    }
-  });
+        } catch (error) {
+            console.error('Error collecting tab:', error);
+            statusDiv.textContent = error.message;
+        } finally {
+            collectButton.disabled = false;
+        }
+    });
+
+    fetchSessions();
 });

@@ -9,7 +9,11 @@
         "storage",
         "activeTab",
         "scripting",
-        "ai"
+        "tabs",
+        "cookies"
+    ],
+    "host_permissions": [
+        "http://localhost/*"
     ]
 }
 

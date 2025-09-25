@@ -42,7 +42,7 @@ export default function ResearchPage() {
     };
 
     fetchSessions();
-  }, []);
+  }, [router, supabase]);
 
   const createNewSession = async () => {
     const { data: { user } } = await supabase.auth.getUser();

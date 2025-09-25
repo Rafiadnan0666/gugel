@@ -29,9 +29,24 @@ export default function NewDraftPage() {
 
   const loadSessions = async () => {
     try {
+      // get draft based on id from research_sessions and base the user_id from there
+      const draftId = router.pathname.split('/').pop();
+      if (!draftId) {
+        setLoading(false);
+        return;
+      }
+      
+      const { data: draftData, error: draftError } = await supabase
+        .from('research_sessions')
+        .select('*')
+        .eq('id', draftId)
+        .single();
+
+      if (draftError) throw draftError;
+
       const { data, error } = await supabase
         .from('research_sessions')
-        .select('id, title')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -43,6 +58,32 @@ export default function NewDraftPage() {
       setLoading(false);
     }
   };
+  const loadDraft = async (draftId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('drafts')
+      .select(`
+        id, content, version, created_at,
+        research_sessions (
+          id, title,
+          profiles (id, full_name, email)
+        )
+      `)
+      .eq('id', draftId)
+      .single();
+
+    if (error) throw error;
+
+    setDraft(data);
+    setEditedContent(data.content);
+  } catch (error) {
+    console.error('Error loading draft:', error);
+    router.push('/drafts');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const createNewSession = async () => {
     if (!newSessionTitle.trim()) return;
@@ -69,52 +110,34 @@ export default function NewDraftPage() {
     }
   };
 
-  const saveDraft = async () => {
-    if (!content.trim()) {
-      alert('Please enter some content for your draft');
-      return;
-    }
+const saveDraft = async () => {
+  if (!draft) return;
 
-    try {
-      setSaving(true);
-      
-      let sessionId = selectedSession;
-      
-      // Create a new session if none selected
-      if (!sessionId) {
-        const sessionResponse = await supabase
-          .from('research_sessions')
-          .insert({
-            title: 'Untitled Session',
-            user_id: (await supabase.auth.getUser()).data.user?.id
-          })
-          .select()
-          .single();
+  try {
+    setSaving(true);
+    const { data, error } = await supabase
+      .from('drafts')
+      .update({
+        content: editedContent.trim(),
+        version: draft.version + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draft.id)
+      .select()
+      .single();
 
-        if (sessionResponse.error) throw sessionResponse.error;
-        sessionId = sessionResponse.data.id;
-      }
+    if (error) throw error;
 
-      const { data, error } = await supabase
-        .from('drafts')
-        .insert({
-          session_id: sessionId,
-          content: content.trim(),
-          version: 1
-        })
-        .select()
-        .single();
+    setDraft(data);
+    setEditing(false);
+  } catch (error) {
+    console.error('Error saving draft:', error);
+    alert('Error saving draft');
+  } finally {
+    setSaving(false);
+  }
+};
 
-      if (error) throw error;
-
-      router.push(`/drafts/${data.id}`);
-    } catch (error) {
-      console.error('Error creating draft:', error);
-      alert('Error creating draft');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (loading) {
     return (
