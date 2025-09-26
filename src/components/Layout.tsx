@@ -1,24 +1,15 @@
-import React from 'react'
-import Sidebar from './Sidebar' 
-import Navbar from './Navbar'
+import React from 'react';
+import Sidebar from './Sidebar';
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children ,  }) => {
+const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     return (
-        <div>
-            <div>
- {/* <Navbar/> */}
-     
-            </div>
-           
-  <div className="layout-container" style={{ display: 'flex', minHeight: '100vh' }}>
+        <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
             <Sidebar />
-            <main style={{ flex: 1, padding: '1rem' }}>
+            <main className="flex-1 md:ml-24 pt-16 md:pt-0">
                 {children}
             </main>
         </div>
-        </div>
-      
-    )
-}
+    );
+};
 
-export default Layout
+export default Layout;
