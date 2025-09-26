@@ -58,6 +58,7 @@ export interface ISessionMessage {
   content: string;
   sender: "user" | "ai";
   created_at: Date;
+  chat_session_id?: string;
 }
 
 export interface ITeam {
@@ -98,6 +99,13 @@ export interface INotification {
   updated_at: Date;
 }
 
+export interface IChat_Session {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  created_at: Date;
+}
 
 export interface IOfflineCache {
   sessions: IResearchSession[];
