@@ -67,6 +67,7 @@ export interface ITeam {
   visibility ?: "private" | "public";
   owner_id: string;
   created_at: Date;
+  updated_at?: Date;
 }
 
 export interface ITeamMember {
@@ -75,6 +76,7 @@ export interface ITeamMember {
   user_id: string;
   role: "owner" | "admin" | "member";
   created_at: Date;
+  profiles: IProfile;
 }
 
 export interface ITeamMessage {
@@ -83,6 +85,7 @@ export interface ITeamMessage {
   user_id: string;
   content: string;
   created_at: Date;
+  profiles: IProfile;
 }
 
 export interface INotification {

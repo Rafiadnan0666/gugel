@@ -114,9 +114,9 @@ export default function TeamPage({ params }: TeamPageProps) {
   
   const [team, setTeam] = useState<ITeam | null>(null);
   const [userProfile, setUserProfile] = useState<IProfile | null>(null);
-  const [teamMembers, setTeamMembers] = useState<(ITeamMember & { profiles: IProfile })[]>([]);
+  const [teamMembers, setTeamMembers] = useState<ITeamMember[]>([]);
   const [sessions, setSessions] = useState<IResearchSession[]>([]);
-  const [teamMessages, setTeamMessages] = useState<(ITeamMessage & { profiles: IProfile })[]>([]);
+  const [teamMessages, setTeamMessages] = useState<ITeamMessage[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'members' | 'chat' | 'analytics'>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [isMember, setIsMember] = useState(false);
@@ -554,7 +554,6 @@ export default function TeamPage({ params }: TeamPageProps) {
         .update({
           name: editedTeam.name,
           description: editedTeam.description,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', teamId);
 

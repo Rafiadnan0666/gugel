@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { IUser, IPost, IProfile } from '@/types/main.db';
+import type { IProfile, IDraft } from '@/types/main.db';
 import { FiEdit2, FiExternalLink } from 'react-icons/fi';
 
 interface EditProfileState {
@@ -20,9 +20,9 @@ export default function ProfilePage() {
   /* ────────────────────────────────
    * STATE
    * ────────────────────────────── */
-  const [authUser, setAuthUser] = useState<IUser | null>(null);
+  const [authUser, setAuthUser] = useState<IProfile | null>(null);
   const [profile, setProfile] = useState<IProfile | null>(null);
-  const [posts, setPosts] = useState<IPost[]>([]);
+  const [drafts, setDrafts] = useState<IDraft[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showEditModal, setShowEditModal] = useState(false);
@@ -57,10 +57,8 @@ setAuthUser({
   id: user.id,
   email: user.email ?? '',
   full_name: user.user_metadata?.full_name ?? '',
-  name: '',
-  password: '',
-  created_at: new Date(),
-  updated_at: new Date(),
+  created_at: new Date(user.created_at),
+  updated_at: new Date(user.updated_at ?? new Date()),
 });
     };
 
@@ -84,15 +82,15 @@ setAuthUser({
       if (profileErr) throw profileErr;
       setProfile(profileData as IProfile);
 
-      // Fetch posts written by the user
-      const { data: postsData, error: postsErr } = await supabase
-        .from('posts')
+      // Fetch drafts written by the user
+      const { data: draftsData, error: draftsErr } = await supabase
+        .from('drafts')
         .select('*')
         .eq('user_id', authUser.id)
         .order('created_at', { ascending: false });
 
-      if (postsErr) throw postsErr;
-      setPosts(postsData || []);
+      if (draftsErr) throw draftsErr;
+      setDrafts(draftsData || []);
     } catch (err) {
       console.error('Error loading profile:', err);
     } finally {
@@ -188,33 +186,22 @@ setAuthUser({
 
           {/* Right – Posts List */}
           <section className="lg:col-span-2 space-y-6">
-            <h1 className="text-3xl font-bold mb-2">Posts by {profile?.full_name || 'you'}</h1>
-            {posts.length === 0 ? (
-              <p className="text-gray-600">You haven’t posted anything yet. Start sharing your thoughts!</p>
+            <h1 className="text-3xl font-bold mb-2">Drafts by {profile?.full_name || 'you'}</h1>
+            {drafts.length === 0 ? (
+              <p className="text-gray-600">You haven’t created any drafts yet.</p>
             ) : (
-              posts.map((post) => (
+              drafts.map((draft) => (
                 <article
-                  key={post.id}
+                  key={draft.id}
                   className="bg-white rounded-lg shadow hover:shadow-md transition border border-gray-200"
                 >
                   <div className="p-6">
-                    <h2 className="text-lg font-semibold mb-2">{post.title}</h2>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap mb-4">
-                      {post.content?.slice(0, 300)}{post.content && post.content.length > 300 && '…'}
+                      {draft.content?.slice(0, 300)}{draft.content && draft.content.length > 300 && '…'}
                     </p>
-                    {post.attachment && (
-                      <a
-                        href={post.attachment}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 text-sm inline-flex items-center gap-1 hover:underline"
-                      >
-                        Attachment <FiExternalLink />
-                      </a>
-                    )}
                   </div>
                   <footer className="px-6 pb-4 text-xs text-gray-500">
-                    {new Date(post.created_at).toLocaleString()}
+                    {new Date(draft.created_at).toLocaleString()}
                   </footer>
                 </article>
               ))

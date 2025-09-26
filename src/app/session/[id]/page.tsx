@@ -1312,24 +1312,21 @@ export default function AdvancedSessionPage() {
         setSessionPermissions(collaborator?.role || 'viewer');
       }
 
-      // Load all data
-      const [tabsResponse, draftsResponse, summariesResponse, collaboratorsResponse, messagesResponse] = await Promise.all([
+      const [tabsResponse, draftsResponse, collaboratorsResponse, messagesResponse] = await Promise.all([
         supabase.from('tabs').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
         supabase.from('drafts').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
-        supabase.from('summaries').select('*').eq('session_id', sessionId),
         supabase.from('session_collaborators').select('*').eq('session_id', sessionId),
         supabase.from('session_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
       ]);
 
-      if (tabsResponse.data) setTabs(tabsResponse.data);
-      if (draftsResponse.data) {
-        setDrafts(draftsResponse.data);
-        if (draftsResponse.data.length > 0) {
-          setCurrentDraft(draftsResponse.data[0].content);
-          setDraftVersion(Math.max(...draftsResponse.data.map(d => d.version)) + 1);
+      if (tabsResponse.data) {
+        setTabs(tabsResponse.data);
+        const tabIds = tabsResponse.data.map(tab => tab.id);
+        if (tabIds.length > 0) {
+          const { data: summariesData } = await supabase.from('summaries').select('*').in('tab_id', tabIds);
+          if (summariesData) setSummaries(summariesData);
         }
       }
-      if (summariesResponse.data) setSummaries(summariesResponse.data);
       if (collaboratorsResponse.data) setCollaborators(collaboratorsResponse.data);
       if (messagesResponse.data) setChatMessages(messagesResponse.data);
 
