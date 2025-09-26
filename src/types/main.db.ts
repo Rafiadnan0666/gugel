@@ -48,6 +48,7 @@ export interface IDraft {
   content: string;
   version: number;
   created_at: Date;
+  user_id?: string;
 }
 
 export interface ISessionMessage {
@@ -82,6 +83,16 @@ export interface ITeamMessage {
   user_id: string;
   content: string;
   created_at: Date;
+}
+
+export interface INotification {
+  id: string;
+  user_id: string;
+  type: string;
+  message: string;
+  read: boolean;
+  created_at: Date;
+  updated_at: Date;
 }
 
 
