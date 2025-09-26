@@ -20,13 +20,24 @@ import {
   FiArchive,
   FiDownload,
   FiUploadCloud,
-  FiCoffee
+  FiCoffee,
+  FiMoon,
+  FiSun
 } from "react-icons/fi";
 import { createClient } from '@/utils/supabase/client';
 import { IoMdRocket } from "react-icons/io";
 import { RiCompassDiscoverLine } from "react-icons/ri";
 import { debounce } from 'lodash';
 import type {  IProfile, IResearchSession,ITeam, } from '@/types/main.db';
+
+interface INotification {
+  id: number;
+  user_id: string;
+  type: string;
+  payload: any;
+  read: boolean;
+  created_at: string;
+}
 
 const Sidebar = () => {
   const router = useRouter();
@@ -45,6 +56,22 @@ const Sidebar = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [offlineData, setOfflineData] = useState<any>(null);
+  const [theme, setTheme] = useState('light');
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+    setTheme(initialTheme);
+    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+  };
 
   const checkOfflineData = useCallback(() => {
     const offlineDataStr = localStorage.getItem('tabwise_offline_data');
@@ -102,12 +129,11 @@ const Sidebar = () => {
         .eq('id', authUser.id)
         .single();
 
-      const userData: IUser = {
+      const userData: IProfile = {
         id: authUser.id,
         email: authUser.email ?? '',
         full_name: userProfile?.full_name || authUser.user_metadata?.full_name || '',
-        name: userProfile?.name || authUser.user_metadata?.name || '',
-        password: '',
+        avatar_url: userProfile?.avatar_url || authUser.user_metadata?.avatar_url || '',
         created_at: new Date(userProfile?.created_at || new Date()),
         updated_at: new Date(userProfile?.updated_at || new Date()),
       };
@@ -116,11 +142,11 @@ const Sidebar = () => {
 
       // Fetch teams user is member of
       const { data: memberTeams } = await supabase
-        .from('member_team')
+        .from('team_members')
         .select('teams(*)')
         .eq('user_id', authUser.id);
       
-      const allTeams = memberTeams?.map((mt: any) => mt.teams).filter(Boolean) || [];
+      const allTeams: ITeam[] = memberTeams?.map((mt: { teams: ITeam }) => mt.teams).filter(Boolean) || [];
       setTeams(allTeams);
 
       // Fetch research sessions
@@ -670,6 +696,9 @@ const Sidebar = () => {
                     {user.full_name || 'Member'}
                   </p>
                 </div>
+                <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400">
+                  {theme === 'light' ? <FiMoon /> : <FiSun />}
+                </button>
                 <button
                   onClick={handleLogout}
                   className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"

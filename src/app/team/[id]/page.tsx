@@ -18,6 +18,46 @@ import {
 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 
+// AI Service Hook
+const useAIService = () => {
+  const [aiSession, setAiSession] = useState<any>(null);
+  const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
+
+  useEffect(() => {
+    const initializeAI = async () => {
+      try {
+        const opts = { expectedOutputs: [{ type: "text", languages: ["en"] }] };
+        const availability = await (window as any).LanguageModel.availability(opts);
+        if (availability === "unavailable") {
+          setAiStatus('unavailable');
+          return;
+        }
+        const session = await (window as any).LanguageModel.create(opts);
+        setAiSession(session);
+        setAiStatus('ready');
+      } catch (err) {
+        setAiStatus('error');
+      }
+    };
+    if ((window as any).LanguageModel) initializeAI();
+    else setAiStatus('error');
+  }, []);
+
+  const cleanAIResponse = (text: string) => text.replace(/##/g, '').replace(/\*\*/g, '').trim();
+
+  const promptAI = async (prompt: string) => {
+    if (!aiSession) return "AI not available";
+    try {
+      const result = await aiSession.prompt(prompt);
+      return cleanAIResponse(result);
+    } catch (error) {
+      return "Error from AI";
+    }
+  };
+
+  return { aiStatus, promptAI };
+};
+
 interface TeamPageProps {
   params: { id: string };
 }
@@ -120,69 +160,14 @@ export default function TeamPage({ params }: TeamPageProps) {
   const [managementAction, setManagementAction] = useState<ManagementAction | null>(null);
   const [isEditingTeam, setIsEditingTeam] = useState(false);
   const [editedTeam, setEditedTeam] = useState({ name: '', description: '', visibility: 'private' as 'private' | 'public' });
+  const { aiStatus, promptAI } = useAIService();
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const aiChatContainerRef = useRef<HTMLDivElement>(null);
 
 
-const checkAIAvailability = async () => {
-  try {
-    if (typeof window.LanguageModel !== "undefined") {
-      const opts = { expectedOutputs: [{ type: "text", languages: ["en"] }] };
-      const availability = await window.LanguageModel.availability(opts);
 
-      // ✅ handle actual statuses
-      return availability === "available" || availability === "downloadable" || availability === "readily";
-    } else if (typeof window.ai !== "undefined") {
-      return true; // old API fallback
-    }
-    return false;
-  } catch (error) {
-    console.warn("AI not available:", error);
-    return false;
-  }
-};
-
-  const createAISession = async () => {
-    try {
-      if (typeof window !== 'undefined') {
-        if (typeof window.LanguageModel !== 'undefined') {
-          const opts = {
-            expectedOutputs: [{ type: "text", languages: ["en"] }],
-            monitor(m: any) {
-              m.addEventListener("downloadprogress", (e: any) => {
-                console.log(`Download progress: ${(e.loaded * 100).toFixed(1)}%`);
-              });
-            }
-          };
-          return await window.LanguageModel.create(opts);
-        } 
-        if (typeof window.ai !== 'undefined') {
-          return {
-            prompt: async (text: string) => {
-              const response = await window.ai!.prompt(text, { 
-                signal: AbortSignal.timeout(30000) 
-              });
-              return { text: () => response };
-            }
-          };
-        }
-      }
-      // Fallback to mock AI for demonstration
-      return {
-        prompt: async (text: string) => {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          return {
-            text: () => `AI Response: I've analyzed your query about "${text.substring(0, 50)}...". Based on team activity and research patterns, I recommend focusing on collaborative analysis and regular knowledge sharing sessions.`
-          };
-        }
-      };
-    } catch (error) {
-      console.error('Error creating AI session:', error);
-      throw error;
-    }
-  };
 
   // Real-time analytics with WebSocket-like updates
   const startAnalyticsPolling = useCallback(() => {
@@ -322,8 +307,6 @@ const checkAIAvailability = async () => {
   // Enhanced AI suggestion generation with team context
   const generateAISuggestions = useCallback(async () => {
     try {
-      const isAIAvailable = await checkAIAvailability();
-      
       const context = `
         Team Analysis Request:
         
@@ -343,10 +326,8 @@ const checkAIAvailability = async () => {
         Please provide 3-5 actionable suggestions to improve team collaboration and research effectiveness.
       `;
 
-      if (isAIAvailable) {
-        const session = await createAISession();
-        const response = await session.prompt(context);
-        const result = await response.text();
+      if (aiStatus === 'ready') {
+        const result = await promptAI(context);
         parseAISuggestions(result);
       } else {
         // Enhanced mock suggestions based on real data
@@ -382,7 +363,7 @@ const checkAIAvailability = async () => {
       console.error('AI suggestion generation failed:', error);
       toast.error('Failed to generate AI suggestions');
     }
-  }, [team, teamMembers, sessions, teamMessages, presenceUsers, onlineUsers]);
+  }, [team, teamMembers, sessions, teamMessages, presenceUsers, onlineUsers, aiStatus, promptAI]);
 
   const parseAISuggestions = (result: string) => {
     try {
@@ -715,8 +696,6 @@ const checkAIAvailability = async () => {
     setIsAiThinking(true);
 
     try {
-      const isAIAvailable = await checkAIAvailability();
-      
       const context = `
         Team Context:
         - Team: ${team?.name}
@@ -734,10 +713,8 @@ const checkAIAvailability = async () => {
 
       let responseText: string;
       
-      if (isAIAvailable) {
-        const session = await createAISession();
-        const response = await session.prompt(context);
-        responseText = await response.text();
+      if (aiStatus === 'ready') {
+        responseText = await promptAI(context);
       } else {
         // Enhanced mock responses
         await new Promise(resolve => setTimeout(resolve, 2000));
@@ -750,7 +727,6 @@ Based on the team's activity (${sessions.length} sessions, ${teamMembers.length}
 2. **Knowledge Sharing**: Create a shared repository for research insights
 3. **Next Steps**: ${aiInput.includes('strategy') ? 'Develop a research roadmap' : 'Conduct user interviews'}
 
-The team has ${presenceUsers.length} members online right now - perfect time for collaboration!
         `.trim();
       }
 

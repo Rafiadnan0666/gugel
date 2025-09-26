@@ -40,3 +40,48 @@ export async function GET(request: Request) {
     },
   });
 }
+
+export async function POST(request: Request) {
+    const { title } = await request.json();
+
+    if (!title) {
+        return NextResponse.json({ error: 'Title is required' }, { status: 400 });
+    }
+
+    const cookieStore = cookies();
+    const supabase = createServerClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        {
+            cookies: {
+                get(name: string) {
+                    return cookieStore.get(name)?.value;
+                },
+            },
+        }
+    );
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data, error } = await supabase
+        .from('research_sessions')
+        .insert([{ title, user_id: user.id }])
+        .select();
+
+    if (error) {
+        console.error('Error creating session:', error);
+        return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
+    }
+
+    return NextResponse.json(data, {
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        },
+    });
+}

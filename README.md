@@ -1,38 +1,79 @@
-🧠 Ideas – Real-time Team Collaboration Platform
-Live: https://ideas-wheat.vercel.app
-Stack: Next.js, Supabase, Tailwind CSS, TypeScript
+# Tabwise — Research, Summarize, and Ship
 
-📌 Overview
-Ideas is a modern team collaboration platform inspired by Notion and Linear. It supports real-time personal and team messaging, team-based posts, and notes that feel like threaded comments. Roles and permissions are in place, with intuitive UI and secure email-based authentication.
+Tabwise is a research assistant that helps you turn your messy browser tabs into organized research sessions. It uses client-side AI (Gemini Nano / Chrome Built-in AI) to summarize content, generate insights, and help you produce polished, ready-to-submit Devpost demos.
 
-✨ Features
-🔐 Auth via Supabase (email confirmation, role-based logic)
+## Key Features
 
-💬 Real-time direct and team chat with Supabase Realtime
+- **Collect Tabs:** Capture your open browser tabs, including URL, title, and content, and save them into organized research sessions.
+- **AI-Powered Summaries:** Use the power of on-device AI to automatically summarize long articles, extract key points, and generate citations.
+- **Rich Text Editor:** Organize your findings, write drafts, and format your research with a full-featured rich text editor.
+- **Team Collaboration:** Work with your team in real-time, share research sessions, and collaborate on drafts.
+- **AI Assistant:** Get intelligent suggestions and insights about your research from the built-in AI assistant.
+- **Dark/Light Mode:** Choose your preferred theme, which automatically syncs with your system preference.
+- **Export to PDF:** Export your research sessions and drafts to PDF for easy sharing and archiving.
 
-📝 Post & comment system (inspired by threads)
+## Tech Stack
 
-📎 Team join via invite link, searchable only if public
+- **Framework:** [Next.js](https://nextjs.org/) (React)
+- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
+- **Database:** [Supabase](https://supabase.io/) (PostgreSQL)
+- **Authentication:** [Supabase Auth](https://supabase.io/docs/guides/auth)
+- **On-Device AI:** [Gemini Nano](https://ai.google.dev/docs/gemini_nano) (via Chrome's built-in AI)
 
-👥 Role system (Owner, Member) with kick/invite
+## Getting Started
 
-🔔 Notification support (non-push)
+### Prerequisites
 
-🧪 Try it Out
-Login with email → Confirm via Gmail → Join or create a team → Start posting or chatting.
+- [Node.js](https://nodejs.org/en/) (v18 or later)
+- [npm](https://www.npmjs.com/)
+- A [Supabase](https://supabase.io/) project
 
-📂 Structure
-app/ – Next.js App Router-based structure
+### Installation
 
-components/ – Reusable UI components
+1.  **Clone the repository:**
 
-lib/ – Supabase utils and helpers
+    ```bash
+    git clone https://github.com/your-username/tabwise.git
+    cd tabwise
+    ```
 
-types/ – Centralized TypeScript types
+2.  **Install dependencies:**
 
-🧠 Ideal Use Case
-Early-stage team collaboration
+    ```bash
+    npm install
+    ```
 
-Internal note-taking or DM systems
+3.  **Set up environment variables:**
 
-Starter kit for real-time Supabase apps
+    Create a `.env.local` file in the root of your project and add your Supabase project URL and anon key:
+
+    ```
+    NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+    ```
+
+4.  **Run the development server:**
+
+    ```bash
+    npm run dev
+    ```
+
+    Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+## Browser Extension
+
+Tabwise also comes with a browser extension to make it even easier to collect your tabs.
+
+### To install the extension:
+
+1.  Navigate to `chrome://extensions` in your Chrome browser.
+2.  Enable "Developer mode".
+3.  Click "Load unpacked" and select the `src/apps/extension` directory from this project.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a pull request or open an issue.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
