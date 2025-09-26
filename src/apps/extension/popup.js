@@ -1,6 +1,8 @@
 document.addEventListener('DOMContentLoaded', function () {
     const sessionSelect = document.getElementById('session');
     const collectButton = document.getElementById('collect');
+    const createSessionButton = document.getElementById('create-session');
+    const newSessionNameInput = document.getElementById('new-session-name');
     const statusDiv = document.getElementById('status');
 
     const API_URL = 'http://localhost:3000';
@@ -27,13 +29,13 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
-    collectButton.addEventListener('click', async () => {
+    async function collectTab(sessionId) {
         collectButton.disabled = true;
+        createSessionButton.disabled = true;
         statusDiv.textContent = 'Collecting...';
 
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-            const sessionId = sessionSelect.value;
 
             if (!tab || !sessionId) {
                 throw new Error('Could not get tab or session ID');
@@ -66,6 +68,52 @@ document.addEventListener('DOMContentLoaded', function () {
             statusDiv.textContent = error.message;
         } finally {
             collectButton.disabled = false;
+            createSessionButton.disabled = false;
+        }
+    }
+
+    collectButton.addEventListener('click', async () => {
+        const sessionId = sessionSelect.value;
+        await collectTab(sessionId);
+    });
+
+    createSessionButton.addEventListener('click', async () => {
+        const newSessionName = newSessionNameInput.value.trim();
+        if (!newSessionName) {
+            statusDiv.textContent = 'Please enter a name for the new session.';
+            return;
+        }
+
+        createSessionButton.disabled = true;
+        statusDiv.textContent = 'Creating session...';
+
+        try {
+            const response = await fetch(`${API_URL}/api/sessions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    title: newSessionName,
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create session');
+            }
+
+            const newSession = await response.json();
+            await fetchSessions();
+            sessionSelect.value = newSession[0].id;
+            await collectTab(newSession[0].id);
+
+        } catch (error) {
+            console.error('Error creating session:', error);
+            statusDiv.textContent = error.message;
+        } finally {
+            createSessionButton.disabled = false;
         }
     });
 

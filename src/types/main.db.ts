@@ -44,7 +44,7 @@ export interface ISummary {
 
 export interface IDraft {
   id: string;
-  session_id: string;
+  research_session_id: string;
   content: string;
   version: number;
   created_at: Date;

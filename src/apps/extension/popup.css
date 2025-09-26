@@ -1,21 +1,21 @@
 body {
     width: 350px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background-color: #f7f7f7;
+    background-color: #f8fafc;
     margin: 0;
-    padding: 15px;
+    padding: 16px;
 }
 
 .container {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 16px;
 }
 
 h1 {
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
+    font-size: 20px;
+    font-weight: 700;
+    color: #1e293b;
     text-align: center;
     margin: 0;
 }
@@ -28,21 +28,22 @@ h1 {
 
 label {
     font-size: 14px;
-    font-weight: 500;
-    color: #555;
+    font-weight: 600;
+    color: #475569;
 }
 
-select, button {
+select, input, button {
     width: 100%;
-    padding: 10px;
-    border-radius: 6px;
-    border: 1px solid #ddd;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
     font-size: 14px;
     background-color: #fff;
+    box-sizing: border-box;
 }
 
 button {
-    background-color: #007aff;
+    background-color: #2563eb;
     color: white;
     font-weight: 600;
     border: none;
@@ -51,21 +52,27 @@ button {
 }
 
 button:hover {
-    background-color: #005ecb;
+    background-color: #1d4ed8;
 }
 
 button:disabled {
-    background-color: #ccc;
+    background-color: #94a3b8;
     cursor: not-allowed;
 }
 
 #status {
     text-align: center;
-    font-size: 13px;
-    color: #666;
-    padding: 8px;
-    background-color: #e9e9e9;
-    border-radius: 6px;
+    font-size: 14px;
+    color: #475569;
+    padding: 10px;
+    background-color: #e2e8f0;
+    border-radius: 8px;
     min-height: 20px;
-    line-height: 1.4;
+    line-height: 1.5;
+}
+
+.divider {
+    height: 1px;
+    background-color: #e2e8f0;
+    margin: 8px 0;
 }

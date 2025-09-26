@@ -36,118 +36,99 @@ const useAIService = () => {
   const [aiSession, setAiSession] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
 
-  const initializeAI = async () => {
-    try {
-      // Simulate Language Model initialization
-      console.log("🔄 Initializing AI Language Model...");
-      
-      // Mock implementation - replace with actual LanguageModel API
-      const mockAISession = {
-        state: 'ready',
-        prompt: async (message: string) => {
-          // Simulate AI processing
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          const responses: Record<string, string> = {
-            'summarize': `Summary: ${message.substring(0, 100)}... Key insights extracted from the content.`,
-            'translate': `Translated content: ${message} [Simulated Translation]`,
-            'rewrite': `Rewritten version: ${message} [Improved and refined]`,
-            'expand': `Expanded content: ${message} [Detailed analysis and additional context provided]`
-          };
-          
-          const action = Object.keys(responses).find(key => 
-            message.toLowerCase().includes(key)
-          ) || 'general';
-          
-          return responses[action] || `AI Response: I've analyzed your content about "${message.substring(0, 50)}..."`;
+  useEffect(() => {
+    const initializeAI = async () => {
+      try {
+        const opts = {
+          expectedOutputs: [{ type: "text", languages: ["en"] }]
+        };
+
+        const availability = await (window as any).LanguageModel.availability(opts);
+        console.log("availability:", availability);
+
+        if (availability === "unavailable") {
+          console.error("❌ Model masih unavailable.");
+          setAiStatus('unavailable');
+          return;
         }
-      };
 
-      setAiSession(mockAISession);
-      setAiStatus('ready');
-      console.log("✅ AI Session ready");
+        const session = await (window as any).LanguageModel.create({
+          ...opts,
+          monitor(m: any) {
+            m.addEventListener("downloadprogress", (e: any) => {
+              console.log(`📥 Download progress: ${(e.loaded * 100).toFixed(1)}%`);
+            });
+            m.addEventListener("statechange", (e: any) => {
+              console.log("⚡ State change:", e.target.state);
+            });
+          }
+        });
 
-    } catch (error) {
-      console.error("❌ AI Initialization error:", error);
+        console.log("✅ Session ready:", session);
+        setAiSession(session);
+        setAiStatus('ready');
+
+      } catch (err) {
+        console.error("Error:", err);
+        setAiStatus('error');
+      }
+    };
+
+    if ((window as any).LanguageModel) {
+      initializeAI();
+    } else {
+      console.error("LanguageModel API not found");
       setAiStatus('error');
+    }
+  }, []);
+
+  const promptAI = async (prompt: string) => {
+    if (!aiSession) {
+      console.error("AI session not ready");
+      return "AI not available";
+    }
+    try {
+      const result = await aiSession.prompt(prompt);
+      return result;
+    } catch (error) {
+      console.error("Error prompting AI:", error);
+      return "Error from AI";
     }
   };
 
   const generateSummary = async (content: string, type: 'tab' | 'draft') => {
-    if (!aiSession) await initializeAI();
-    
-    try {
-      const prompt = `Summarize this ${type} content: ${content.substring(0, 2000)}`;
-      return await aiSession.prompt(prompt);
-    } catch (error) {
-      console.error('Error generating summary:', error);
-      return `Summary: ${content.split(' ').slice(0, 30).join(' ')}...`;
-    }
+    const prompt = `Summarize this ${type} content: ${content.substring(0, 2000)}`;
+    return await promptAI(prompt);
   };
 
   const translateContent = async (content: string, targetLanguage: string) => {
-    if (!aiSession) await initializeAI();
-    
-    try {
-      const prompt = `Translate to ${targetLanguage}: ${content.substring(0, 2000)}`;
-      return await aiSession.prompt(prompt);
-    } catch (error) {
-      console.error('Error translating content:', error);
-      return content;
-    }
+    const prompt = `Translate to ${targetLanguage}: ${content.substring(0, 2000)}`;
+    return await promptAI(prompt);
   };
 
   const rewriteContent = async (content: string, style: string = 'academic') => {
-    if (!aiSession) await initializeAI();
-    
-    try {
-      const prompt = `Rewrite in ${style} style: ${content.substring(0, 2000)}`;
-      return await aiSession.prompt(prompt);
-    } catch (error) {
-      console.error('Error rewriting content:', error);
-      return content;
-    }
+    const prompt = `Rewrite in ${style} style: ${content.substring(0, 2000)}`;
+    return await promptAI(prompt);
   };
 
   const expandContent = async (content: string, context: string) => {
-    if (!aiSession) await initializeAI();
-    
-    try {
-      const prompt = `Expand this content with ${context}: ${content.substring(0, 2000)}`;
-      return await aiSession.prompt(prompt);
-    } catch (error) {
-      console.error('Error expanding content:', error);
-      return content;
-    }
+    const prompt = `Expand this content with ${context}: ${content.substring(0, 2000)}`;
+    return await promptAI(prompt);
   };
 
   const autoGenerateDraft = async (tabs: ITab[], theme: string) => {
-    if (!aiSession) await initializeAI();
+    const tabContents = tabs.map(tab => 
+      `Source: ${tab.title}\nContent: ${tab.content?.substring(0, 500)}`
+    ).join('\n\n');
     
-    try {
-      const tabContents = tabs.map(tab => 
-        `Source: ${tab.title}\nContent: ${tab.content?.substring(0, 500)}`
-      ).join('\n\n');
-      
-      const prompt = `Create a research draft about ${theme} using these sources:\n\n${tabContents}`;
-      return await aiSession.prompt(prompt);
-    } catch (error) {
-      console.error('Error generating draft:', error);
-      return 'Draft generation failed. Please try again.';
-    }
+    const prompt = `Create a research draft about ${theme} using these sources:\n\n${tabContents}`;
+    return await promptAI(prompt);
   };
 
   const chatWithAI = async (message: string, context: { tabs: ITab[], drafts: IDraft[] }) => {
-    if (!aiSession) await initializeAI();
-    
-    try {
-      const contextSummary = `Research Context: ${context.tabs.length} tabs, ${context.drafts.length} drafts`;
-      const prompt = `${contextSummary}\n\nUser Question: ${message}`;
-      return await aiSession.prompt(prompt);
-    } catch (error) {
-      console.error('Error in AI chat:', error);
-      return "I'm having trouble processing your request. Please try again.";
-    }
+    const contextSummary = `Research Context: ${context.tabs.length} tabs, ${context.drafts.length} drafts`;
+    const prompt = `${contextSummary}\n\nUser Question: ${message}`;
+    return await promptAI(prompt);
   };
 
   return {
@@ -158,7 +139,8 @@ const useAIService = () => {
     expandContent,
     autoGenerateDraft,
     chatWithAI,
-    initializeAI
+    promptAI, // expose promptAI
+    initializeAI: () => {} // No-op, initialization is now in useEffect
   };
 };
 
@@ -867,6 +849,114 @@ const AIChat: React.FC<{
   );
 };
 
+const InviteCollaboratorForm: React.FC<{
+  sessionId: string;
+  onInviteSent: () => void;
+}> = ({ sessionId, onInviteSent }) => {
+  const [email, setEmail] = useState('');
+  const [role, setRole] = useState<'editor' | 'viewer'>('viewer');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const supabase = createClient();
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (userError || !userData) {
+        throw new Error('User with this email not found.');
+      }
+
+      const userId = userData.id;
+
+
+      const { data: existingCollaborator, error: existingError } = await supabase
+        .from('session_collaborators')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('user_id', userId)
+        .single();
+
+      if (existingCollaborator) {
+        throw new Error('User is already a collaborator.');
+      }
+
+
+      const { error: insertError } = await supabase
+        .from('session_collaborators')
+        .insert({
+          session_id: sessionId,
+          user_id: userId,
+          role: role,
+        });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      setSuccess(`Successfully invited ${email} as a ${role}.`);
+      setEmail('');
+
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleInvite} className="space-y-4">
+      {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">{error}</div>}
+      {success && <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-800">{success}</div>}
+      
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Email address</label>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="collaborator@example.com"
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          required
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as 'editor' | 'viewer')}
+          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        >
+          <option value="viewer">Viewer</option>
+          <option value="editor">Editor</option>
+        </select>
+      </div>
+
+      <div className="flex justify-end pt-4">
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
+        >
+          {isLoading ? 'Sending Invite...' : 'Send Invite'}
+        </button>
+      </div>
+    </form>
+  );
+};
+
 // Main Session Page Component
 export default function AdvancedSessionPage() {
   const params = useParams();
@@ -895,6 +985,7 @@ export default function AdvancedSessionPage() {
   const [collaborators, setCollaborators] = useState<ISessionCollaborator[]>([]);
   const [showFullEditor, setShowFullEditor] = useState(false);
   const [aiGeneratedDrafts, setAiGeneratedDrafts] = useState<string[]>([]);
+  const [isAIGenerating, setIsAIGenerating] = useState(false);
 
   // Enhanced Hooks
   const { 
@@ -913,24 +1004,20 @@ export default function AdvancedSessionPage() {
     expandContent,
     autoGenerateDraft, 
     chatWithAI,
+    promptAI,
     initializeAI 
   } = useAIService();
 
-  // Initialize AI on component mount
-  useEffect(() => {
-    initializeAI();
-  }, []);
+
 
   // Enhanced AI Analysis for URLs
   const analyzeURLWithAI = async (url: string) => {
     try {
-      // Simulate AI analysis of webpage content
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      const content = await promptAI(`Summarize the content of the page at this URL: ${url}`);
       const domain = new URL(url).hostname;
       return {
         title: `AI Analysis: ${domain}`,
-        content: `This is an AI-generated summary of content from ${domain}. The analysis includes key points, main themes, and important information extracted using natural language processing. Key findings suggest this source discusses relevant topics that could enhance your research.`
+        content: content
       };
     } catch (error) {
       throw new Error('AI analysis failed');
@@ -1114,6 +1201,15 @@ export default function AdvancedSessionPage() {
     }
   };
 
+  const shareSession = () => {
+    const url = window.location.href;
+    navigator.clipboard.writeText(url).then(() => {
+      setModal({ type: 'success', data: { message: 'Session link copied to clipboard!' } });
+    }, () => {
+      setModal({ type: 'error', data: { message: 'Failed to copy session link.' } });
+    });
+  };
+
   const handleAIAction = async (action: string, content: string) => {
     switch (action) {
       case 'summarize':
@@ -1133,13 +1229,32 @@ export default function AdvancedSessionPage() {
     }
   };
 
+  const exportToPDF = () => {
+    const draftElement = document.querySelector('.prose'); // Assuming the draft content is in an element with class 'prose'
+    if (draftElement) {
+      import('html2canvas').then(html2canvas => {
+        import('jspdf').then(jsPDF => {
+          html2canvas.default(draftElement as HTMLElement).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF.default();
+            const imgProps= pdf.getImageProperties(imgData);
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save(`${session?.title || 'research'}-draft.pdf`);
+          });
+        });
+      });
+    }
+  };
+
   const generateAIDraft = async () => {
     if (tabs.length === 0) {
       setModal({ type: 'error', data: { message: 'No research tabs available for AI draft generation.' } });
       return;
     }
 
-    setIsChatLoading(true);
+    setIsAIGenerating(true);
     try {
       const aiDraft = await autoGenerateDraft(tabs, 'comprehensive research paper');
       setCurrentDraft(aiDraft);
@@ -1147,7 +1262,7 @@ export default function AdvancedSessionPage() {
     } catch (error) {
       setModal({ type: 'error', data: { message: 'Failed to generate AI draft.' } });
     } finally {
-      setIsChatLoading(false);
+      setIsAIGenerating(false);
     }
   };
 
@@ -1800,7 +1915,9 @@ export default function AdvancedSessionPage() {
                     </div>
                   </button>
 
-                  <button className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <button 
+                    onClick={shareSession}
+                    className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex items-center space-x-3">
                       <FiShare2 className="w-5 h-5 text-green-600" />
                       <div>
@@ -1810,7 +1927,9 @@ export default function AdvancedSessionPage() {
                     </div>
                   </button>
 
-                  <button className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <button 
+                    onClick={exportToPDF}
+                    className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex items-center space-x-3">
                       <FiDownload className="w-5 h-5 text-purple-600" />
                       <div>
@@ -1826,6 +1945,17 @@ export default function AdvancedSessionPage() {
         )}
       </div>
 
+      <Modal
+        isOpen={isAIGenerating}
+        onClose={() => {}}
+        title="AI is thinking..."
+      >
+        <div className="flex items-center justify-center space-x-3 p-6">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="text-gray-700">Please wait while the AI is generating content.</p>
+        </div>
+      </Modal>
+
       {/* AI-Powered Tab Modal */}
       <AITabModal
         isOpen={showTabModal}
@@ -1837,6 +1967,15 @@ export default function AdvancedSessionPage() {
         editingTab={editingTab}
         onAIAnalyze={analyzeURLWithAI}
       />
+
+      <Modal
+        isOpen={modal.type === 'invite-collaborator'}
+        onClose={() => setModal({ type: '' })}
+        title="Invite Collaborators"
+        size="md"
+      >
+        <InviteCollaboratorForm sessionId={sessionId} onInviteSent={() => setModal({ type: '' })} />
+      </Modal>
 
       {/* Success/Error Modals */}
       <Modal
