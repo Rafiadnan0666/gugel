@@ -450,15 +450,15 @@ const Sidebar = () => {
               </li>
               <li>
                 <button
-                  onClick={() => navigateTo('/explore')}
+                  onClick={() => navigateTo('/aichat')}
                   className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                    pathname === '/explore' 
+                    pathname === '/aichat' 
                       ? 'bg-orange-50 dark:bg-gray-800 text-orange-500 dark:text-orange-400' 
                       : 'text-gray-900 dark:text-white'
                   }`}
                 >
-                  <RiCompassDiscoverLine className="text-lg" />
-                  <span className="ml-3">Explore</span>
+                  <FiMessageSquare className="text-lg" />
+                  <span className="ml-3">AI chat</span>
                 </button>
               </li>
               

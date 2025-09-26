@@ -3,13 +3,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { INotification, IUser } from '@/types/main.db';
+import type { INotification, IProfile } from '@/types/main.db';
 import { FiMail, FiBell, FiCheck, FiMessageSquare, FiThumbsUp, FiUserPlus, FiShare2 } from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
 import Link from 'next/link';
 
 export default function Notifications() {
-  const [authUser, setAuthUser] = useState<IUser | null>(null);
+  const [authUser, setAuthUser] = useState<IProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<INotification[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
@@ -31,10 +31,8 @@ export default function Notifications() {
         id: user.id,
         email: user.email ?? '',
         full_name: user.user_metadata?.full_name ?? '',
-        name: '',
-        password: '',
-        created_at: new Date(),
-        updated_at: new Date(),
+        created_at: new Date(user.created_at),
+        updated_at: new Date(user.updated_at ?? new Date()),
       });
       setLoading(false);
     };
@@ -97,7 +95,7 @@ export default function Notifications() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
-  const markAsRead = async (notificationId: number) => {
+  const markAsRead = async (notificationId: string) => {
     try {
       const { error } = await supabase
         .from('notifications')
@@ -142,26 +140,6 @@ export default function Notifications() {
         return <FiShare2 className="text-purple-500" />;
       default:
         return <FiBell className="text-orange-500" />;
-    }
-  };
-
-  const getNotificationText = (type: string, payload: string) => {
-    try {
-      const payloadObj = JSON.parse(payload);
-      switch (type) {
-        case 'message':
-          return `New message from ${payloadObj.sender}`;
-        case 'like':
-          return `${payloadObj.user} liked your post "${payloadObj.postTitle}"`;
-        case 'follow':
-          return `${payloadObj.user} started following you`;
-        case 'mention':
-          return `${payloadObj.user} mentioned you in a post`;
-        default:
-          return payload;
-      }
-    } catch {
-      return payload;
     }
   };
 
@@ -253,7 +231,7 @@ export default function Notifications() {
                     </div>
                     <div className="ml-3 flex-1 min-w-0">
                       <p className="text-sm text-gray-900">
-                        {getNotificationText(notification.type, notification.payload)}
+                        {notification.message}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">
                         {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
