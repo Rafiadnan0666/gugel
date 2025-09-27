@@ -9,7 +9,8 @@ import {
   FiArrowLeft, FiSave, FiDownload, FiZap, FiCpu, FiFileText,
   FiBold, FiItalic, FiUnderline, FiList, FiAlignLeft,
   FiAlignCenter, FiAlignRight, FiLink2, FiOctagon, FiRotateCw,
-  FiTarget, FiCoffee, FiAward, FiGlobe
+  FiTarget, FiCoffee, FiAward, FiGlobe,
+  FiSmile, FiBriefcase
 } from 'react-icons/fi';
 
 // AI Service Hook (copied from session page)
@@ -140,6 +141,12 @@ const AdvancedEditor: React.FC<{
     { id: 'formalize', label: 'Formalize', icon: FiAward },
   ];
 
+  const AI_TONE_TOOLS = [
+    { id: 'casual', label: 'Make Casual', icon: FiCoffee },
+    { id: 'friendly', label: 'Make Friendly', icon: FiSmile },
+    { id: 'professional', label: 'Make Professional', icon: FiBriefcase },
+  ];
+
   return (
     <div className="border border-gray-300 rounded-lg overflow-hidden relative">
       <div className="flex flex-wrap items-center gap-1 p-2 border-b border-gray-200 bg-gray-50">
@@ -157,9 +164,17 @@ const AdvancedEditor: React.FC<{
       
       {showAITools && (
         <div className="absolute top-12 left-2 z-10 bg-white border rounded-lg shadow-xl w-60 p-2">
+          <p className="text-xs font-semibold text-gray-500 px-2 pt-1 pb-2">Content</p>
           {AI_TOOLS.map(tool => (
             <button key={tool.id} onClick={() => handleAIAction(tool.id)} disabled={isAILoading} className="w-full flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-left disabled:opacity-50">
               <tool.icon className="w-4 h-4 text-blue-600" />
+              <span>{tool.label}</span>
+            </button>
+          ))}
+          <p className="text-xs font-semibold text-gray-500 px-2 pt-3 pb-2">Tone</p>
+          {AI_TONE_TOOLS.map(tool => (
+            <button key={tool.id} onClick={() => handleAIAction(tool.id)} disabled={isAILoading} className="w-full flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 text-left disabled:opacity-50">
+              <tool.icon className="w-4 h-4 text-green-600" />
               <span>{tool.label}</span>
             </button>
           ))}
@@ -248,6 +263,12 @@ export default function DraftEditPage() {
         return await rewriteContent(content, 'simple');
       case 'formalize':
         return await rewriteContent(content, 'formal');
+      case 'casual':
+        return await rewriteContent(content, 'casual');
+      case 'friendly':
+        return await rewriteContent(content, 'friendly');
+      case 'professional':
+        return await rewriteContent(content, 'professional');
       default:
         return content;
     }

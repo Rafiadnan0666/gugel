@@ -5,6 +5,8 @@ import { IChat_Session, ISessionMessage, IDraft } from '@/types/main.db'
 import { createClient } from '@supabase/supabase-js'
 import { useParams, useRouter } from 'next/navigation'
 import { FiSend, FiDownload, FiTrash2, FiEdit, FiArrowLeft } from 'react-icons/fi'
+import useAuth from '@/hooks/useAuth'
+import AIResponse from '@/components/AIResponse'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,26 +31,24 @@ const ChatPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user, loading: authLoading } = useAuth();
 
   useEffect(() => {
-    if (sessionId) {
+    if (!authLoading && !user) {
+      router.push('/sign-in');
+    } else if (user && sessionId) {
       fetchSessionData();
       subscribeToMessages();
     }
-  }, [sessionId]);
+  }, [user, authLoading, sessionId, router]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
   const fetchSessionData = async () => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/sign-in');
-        return;
-      }
-
       // Fetch session
       const { data: sessionData, error: sessionError } = await supabase
         .from('chat_sessions')
@@ -102,13 +102,10 @@ const ChatPage = () => {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || isSending) return;
+    if (!newMessage.trim() || isSending || !user) return;
 
     setIsSending(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       // Add user message
       const { data: userMessage, error: userError } = await supabase
         .from('session_messages')
@@ -123,6 +120,20 @@ const ChatPage = () => {
         .single();
 
       if (userError) throw userError;
+
+      // Create notification
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: user.id,
+          type: 'ai_chat_message',
+          message: `You have a new message in the chat "${session?.title}" `,
+          read: false,
+        });
+
+      if (notificationError) {
+        throw notificationError;
+      }
 
       setNewMessage('');
 
@@ -152,10 +163,8 @@ const ChatPage = () => {
   };
 
   const exportToDraft = async () => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const conversation = messages.map(msg => 
         `${msg.sender === 'user' ? 'User' : 'AI'}: ${msg.content}`
       ).join('\n\n');
@@ -209,7 +218,7 @@ const ChatPage = () => {
     }
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <Layout>
         <div className="flex h-screen items-center justify-center">
@@ -286,29 +295,26 @@ const ChatPage = () => {
               messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${
+                  className={`flex ${ 
                     message.sender === 'user' ? 'justify-end' : 'justify-start'
                   }`}
                 >
-                  <div
-                    className={`max-w-2xl rounded-lg px-4 py-3 ${
-                      message.sender === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap">{message.content}</div>
-                    <div
-                      className={`text-xs mt-2 ${
-                        message.sender === 'user'
-                          ? 'text-blue-100'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      {new Date(message.created_at).toLocaleTimeString()}
-                    </div>
-                  </div>
-                </div>
+                                    <div
+                                      className={`max-w-2xl w-full ${
+                                        message.sender === 'user' ? 'ml-auto' : ''
+                                      }`}
+                                    >
+                                      {message.sender === 'user' ? (
+                                        <div className="bg-blue-500 text-white rounded-lg px-4 py-3">
+                                          <div className="whitespace-pre-wrap">{message.content}</div>
+                                          <div className="text-xs mt-2 text-blue-100">
+                                            {new Date(message.created_at).toLocaleTimeString()}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <AIResponse content={message.content} />
+                                      )}
+                                    </div>                </div>
               ))
             )}
             <div ref={messagesEndRef} />

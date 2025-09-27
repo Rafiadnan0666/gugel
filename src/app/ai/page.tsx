@@ -5,6 +5,7 @@ import { IChat_Session, IResearchSession, IDraft } from '@/types/main.db'
 import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { FiPlus, FiMessageSquare, FiEdit, FiDownload, FiTrash2 } from 'react-icons/fi'
+import useAuth from '@/hooks/useAuth'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,19 +18,19 @@ const AiPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'research'>('chat');
   const router = useRouter();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
-    fetchSessions();
-  }, []);
+    if (!loading && !user) {
+      router.push('/sign-in');
+    } else if (user) {
+      fetchSessions();
+    }
+  }, [user, loading, router]);
 
   const fetchSessions = async () => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/sign-in');
-        return;
-      }
-
       // Fetch chat sessions
       const { data: chatSessionsData, error: chatError } = await supabase
         .from('chat_sessions')
@@ -58,13 +59,8 @@ const AiPage = () => {
   };
 
   const createNewChat = async () => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/sign-in');
-        return;
-      }
-
       const { data: newSession, error } = await supabase
         .from('chat_sessions')
         .insert({
@@ -85,13 +81,8 @@ const AiPage = () => {
   };
 
   const createNewResearch = async () => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/sign-in');
-        return;
-      }
-
       const { data: newSession, error } = await supabase
         .from('research_sessions')
         .insert({
@@ -111,6 +102,7 @@ const AiPage = () => {
   };
 
   const deleteSession = async (sessionId: string, type: 'chat' | 'research') => {
+    if (!user) return;
     try {
       const table = type === 'chat' ? 'chat_sessions' : 'research_sessions';
       const { error } = await supabase
@@ -131,11 +123,8 @@ const AiPage = () => {
   };
 
   const exportToDraft = async (sessionId: string, type: 'chat' | 'research') => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // For now, we'll create a simple draft. In a real app, you'd want to export the actual content
       const { data: draft, error } = await supabase
         .from('drafts')
         .insert({
@@ -154,6 +143,16 @@ const AiPage = () => {
       alert('Error exporting session to draft');
     }
   };
+
+  if (loading || isLoading) {
+    return (
+      <Layout>
+        <div className="flex h-screen items-center justify-center">
+          <div className="text-lg">Loading sessions...</div>
+        </div>
+      </Layout>
+    );
+  }
 
   const sessions = activeTab === 'chat' ? chatSessions : researchSessions;
 
@@ -198,9 +197,7 @@ const AiPage = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {isLoading ? (
-              <div className="p-4 text-center text-gray-500">Loading sessions...</div>
-            ) : sessions.length === 0 ? (
+            {sessions.length === 0 ? (
               <div className="p-4 text-center text-gray-500">
                 No {activeTab} sessions found.
               </div>
