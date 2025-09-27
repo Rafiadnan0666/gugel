@@ -978,7 +978,8 @@ export default function TeamPage({ params }: TeamPageProps) {
                 {teamMessages.map(message => (
                   <div key={message.id} className="flex space-x-3">
                     <div className="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0 flex items-center justify-center">
-                      <FiUser className="text-gray-600 text-sm" />
+                      {/* <FiUser className="text-gray-600 text-sm" /> */}
+                      <img className="w-8 h-8 rounded-full" src={message.profiles?.avatar_url || '/default-avatar.png'} alt="" />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-1">

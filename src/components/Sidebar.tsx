@@ -340,7 +340,7 @@ const Sidebar = () => {
                 className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white font-medium cursor-pointer"
                 onClick={() => navigateTo('/profile')}
               >
-                {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
+                {user.username?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
@@ -450,9 +450,9 @@ const Sidebar = () => {
               </li>
               <li>
                 <button
-                  onClick={() => navigateTo('/aichat')}
+                  onClick={() => navigateTo('/ai')}
                   className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                    pathname === '/aichat' 
+                    pathname === '/ai' 
                       ? 'bg-orange-50 dark:bg-gray-800 text-orange-500 dark:text-orange-400' 
                       : 'text-gray-900 dark:text-white'
                   }`}

@@ -50,7 +50,6 @@ export interface IDraft {
   created_at: Date;
   user_id?: string;
 }
-
 export interface ISessionMessage {
   id: string;
   session_id: string;
@@ -65,11 +64,12 @@ export interface ITeam {
   id: string;
   name: string;
   description?: string;
-  visibility ?: "private" | "public";
+  visibility?: "private" | "public";
   owner_id: string;
   created_at: Date;
   updated_at?: Date;
 }
+
 
 export interface ITeamMember {
   id: string;
@@ -79,7 +79,6 @@ export interface ITeamMember {
   created_at: Date;
   profiles: IProfile;
 }
-
 export interface ITeamMessage {
   id: string;
   team_id: string;
@@ -88,7 +87,6 @@ export interface ITeamMessage {
   created_at: Date;
   profiles: IProfile;
 }
-
 export interface INotification {
   id: string;
   user_id: string;
@@ -107,6 +105,7 @@ export interface IChat_Session {
   created_at: Date;
 }
 
+
 export interface IOfflineCache {
   sessions: IResearchSession[];
   tabs: ITab[];
@@ -118,7 +117,6 @@ export interface IOfflineCache {
   team_messages: ITeamMessage[];
   last_synced: Date;
 }
-
 
 
 
