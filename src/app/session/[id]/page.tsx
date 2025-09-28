@@ -1032,11 +1032,23 @@ export default function AdvancedSessionPage() {
   // Enhanced AI Analysis for URLs
   const analyzeURLWithAI = async (url: string) => {
     try {
-      const response = await web_fetch({ prompt: url });
-      const summary = await promptAI(`Summarize this content: ${response.content}`);
+      const response = await fetch('/api/summarize-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze URL');
+      }
+
+      const data = await response.json();
       return {
-        title: response.title || new URL(url).hostname,
-        content: summary
+        title: data.title,
+        content: data.summary,
       };
     } catch (error) {
       console.error('AI Analysis failed:', error);
@@ -1191,15 +1203,14 @@ export default function AdvancedSessionPage() {
   };
 
   const sendChatMessage = async (content: string) => {
-    const userMessage: ISessionMessage = {
-      id: Date.now().toString(),
-      session_id: sessionId,
-      user_id: userProfile?.id,
-      content,
-      sender: 'user',
-      created_at: new Date()
-    };
-
+const userMessage: ISessionMessage = {
+  id: crypto.randomUUID(),
+  session_id: sessionId,
+  user_id: userProfile?.id,
+  content,
+  sender: 'user',
+  created_at: new Date()
+};
     setChatMessages(prev => [...prev, userMessage]);
     setIsChatLoading(true);
 
@@ -1209,13 +1220,13 @@ export default function AdvancedSessionPage() {
       if (userErr) throw userErr;
 
       const aiResponse = await chatWithAI(content, { tabs, drafts });
-      const aiMessage: ISessionMessage = {
-        id: (Date.now() + 1).toString(),
-        session_id: sessionId,
-        content: aiResponse,
-        sender: 'ai',
-        created_at: new Date()
-      };
+const aiMessage: ISessionMessage = {
+  id: crypto.randomUUID(),
+  session_id: sessionId,
+  content: aiResponse,
+  sender: 'ai',
+  created_at: new Date()
+};
 
       // Save AI message
       const { data: aiMsg, error: aiErr } = await supabase.from('session_messages').insert(aiMessage).select().single();
@@ -1236,9 +1247,15 @@ export default function AdvancedSessionPage() {
       }
 
       setChatMessages(prev => [...prev, userMsg, aiMsg]);
-    } catch (error) {
-      console.error('Error getting AI response:', error);
-    } finally {
+} catch (error) {
+  if (error instanceof Error) {
+    console.error('Error getting AI response:', error.message, error.stack);
+  } else {
+    console.error('Error getting AI response:', JSON.stringify(error));
+  }
+}
+
+finally {
       setIsChatLoading(false);
     }
   };
