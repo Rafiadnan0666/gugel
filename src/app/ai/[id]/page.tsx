@@ -7,6 +7,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { FiSend, FiDownload, FiTrash2, FiEdit, FiArrowLeft } from 'react-icons/fi'
 import useAuth from '@/hooks/useAuth'
 import AIResponse from '@/components/AIResponse'
+import { useAdvancedAIService } from '@/hooks/useAdvancedAIService';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,7 @@ const ChatPage = () => {
   const params = useParams();
   const router = useRouter();
   const sessionId = params.id as string;
+  const aiService = useAdvancedAIService();
   
   const [session, setSession] = useState<IChat_Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -104,7 +106,10 @@ const ChatPage = () => {
   const sendMessage = async () => {
     if (!newMessage.trim() || isSending || !user) return;
 
+    const messageContent = newMessage;
+    setNewMessage('');
     setIsSending(true);
+
     try {
       // Add user message
       const { data: userMessage, error: userError } = await supabase
@@ -112,7 +117,7 @@ const ChatPage = () => {
         .insert({
           session_id: sessionId,
           user_id: user.id,
-          content: newMessage,
+          content: messageContent,
           sender: 'user',
           chat_session_id: sessionId
         })
@@ -135,25 +140,20 @@ const ChatPage = () => {
         throw notificationError;
       }
 
-      setNewMessage('');
+      const aiResponse = await aiService.promptAI(messageContent);
+      
+      const { data: aiMessage, error: aiError } = await supabase
+        .from('session_messages')
+        .insert({
+          session_id: sessionId,
+          content: aiResponse,
+          sender: 'ai',
+          chat_session_id: sessionId
+        })
+        .select()
+        .single();
 
-      // Simulate AI response (replace with actual AI service)
-      setTimeout(async () => {
-        const aiResponse = `This is a simulated response to: "${newMessage}". In a real application, this would connect to an AI service.`;
-        
-        const { data: aiMessage, error: aiError } = await supabase
-          .from('session_messages')
-          .insert({
-            session_id: sessionId,
-            content: aiResponse,
-            sender: 'ai',
-            chat_session_id: sessionId
-          })
-          .select()
-          .single();
-
-        if (aiError) throw aiError;
-      }, 1000);
+      if (aiError) throw aiError;
 
     } catch (error) {
       console.error('Error sending message:', error);

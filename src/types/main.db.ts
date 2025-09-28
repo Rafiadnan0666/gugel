@@ -25,13 +25,14 @@ export interface ISessionCollaborator {
 }
 
 export interface ITab {
-  favicon: string;
+  // favicon: string;
   id: string;
   session_id: string;
   url: string;
   title?: string;
   content?: string;
   created_at: Date;
+  user_id?: string;
 }
 export interface ISummary {
   id: string;
