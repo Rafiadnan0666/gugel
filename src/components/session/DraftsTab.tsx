@@ -2,7 +2,7 @@
 
 import { FiZap, FiSave, FiMaximize, FiEye, FiEdit2 } from 'react-icons/fi';
 import type { IDraft, IProfile } from '@/types/main.db';
-import AdvancedEditor from './AdvancedEditor'; // Assuming AdvancedEditor is refactored as well
+import AdvancedEditor from '@/components/editor/AdvancedEditor';
 
 interface DraftsTabProps {
   tabs: any[]; // Simplified for now

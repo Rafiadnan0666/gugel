@@ -2,20 +2,16 @@
 import Layout from '@/components/Layout'
 import React, { useState, useEffect } from 'react'
 import { IChat_Session, IResearchSession, IDraft } from '@/types/main.db'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation'
 import { FiPlus, FiMessageSquare, FiEdit, FiDownload, FiTrash2 } from 'react-icons/fi'
 import useAuth from '@/hooks/useAuth'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+const supabase = createClient();
 
 const AiPage = () => {
   const [chatSessions, setChatSessions] = useState<IChat_Session[]>([]);
   const [researchSessions, setResearchSessions] = useState<IResearchSession[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'chat' | 'research'>('chat');
   const router = useRouter();
   const { user, loading } = useAuth();
@@ -31,16 +27,16 @@ const AiPage = () => {
   const fetchSessions = async () => {
     if (!user) return;
     try {
-      // Fetch chat sessions
+   
       const { data: chatSessionsData, error: chatError } = await supabase
-        .from('chat_sessions')
+        .from('chat_sesssion')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (chatError) throw chatError;
 
-      // Fetch research sessions
+     
       const { data: researchSessionsData, error: researchError } = await supabase
         .from('research_sessions')
         .select('*')
@@ -52,31 +48,40 @@ const AiPage = () => {
       setChatSessions(chatSessionsData || []);
       setResearchSessions(researchSessionsData || []);
     } catch (error) {
-      console.error('Error fetching sessions:', error);
-    } finally {
-      setIsLoading(false);
+      if (error instanceof Error) {
+        console.error('Error fetching session data:', error.message, error.stack);
+      } else {
+        console.error('Error fetching session data:', JSON.stringify(error));
+  }
+}
+
+     finally {
     }
   };
 
   const createNewChat = async () => {
     if (!user) return;
     try {
-      const { data: newSession, error } = await supabase
-        .from('chat_sessions')
-        .insert({
-          title: 'New Chat',
-          user_id: user.id,
-          description: 'AI Assistant Session'
-        })
-        .select()
-        .single();
+    
+const { data: newSession, error } = await supabase
+  .from('chat_sesssion')
+  .insert({
+    title: 'New Chat',
+    user_id: user.id,
+    description: 'AI Assistant Session'
+  })
+  .select()
+  .single();
 
       if (error) throw error;
       if (newSession) {
         router.push(`/ai/${newSession.id}`);
       }
     } catch (error) {
-      console.error('Error creating new chat session:', error);
+      console.error('Error creating new chat session:', JSON.stringify(error, null, 2));
+      if (error && Object.keys(error).length === 0) {
+        console.error("An empty error object was caught. This might be due to a Row Level Security (RLS) policy violation in Supabase. Please check your insert policies for the 'chat_sessions' table.");
+      }
     }
   };
 
@@ -97,14 +102,17 @@ const AiPage = () => {
         router.push(`/ai/research/${newSession.id}`);
       }
     } catch (error) {
-      console.error('Error creating new research session:', error);
+      console.error('Error creating new research session:', JSON.stringify(error, null, 2));
+      if (error && Object.keys(error).length === 0) {
+        console.error("An empty error object was caught. This might be due to a Row Level Security (RLS) policy violation in Supabase. Please check your insert policies for the 'research_sessions' table.");
+      }
     }
   };
 
   const deleteSession = async (sessionId: string, type: 'chat' | 'research') => {
     if (!user) return;
     try {
-      const table = type === 'chat' ? 'chat_sessions' : 'research_sessions';
+      const table = type === 'chat' ? 'chat_sesssion' : 'research_sessions';
       const { error } = await supabase
         .from(table)
         .delete()
@@ -125,11 +133,32 @@ const AiPage = () => {
   const exportToDraft = async (sessionId: string, type: 'chat' | 'research') => {
     if (!user) return;
     try {
+      let contentToExport = '';
+      if (type === 'chat') {
+        const { data: messages, error } = await supabase
+          .from('session_messages')
+          .select('content, sender')
+          .eq('chat_session_id', sessionId)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+        contentToExport = messages.map(msg => `${msg.sender}: ${msg.content}`).join('\n\n');
+      } else {
+        const { data: draft, error } = await supabase
+          .from('drafts')
+          .select('content')
+          .eq('research_session_id', sessionId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+        if (error) throw error;
+        contentToExport = draft?.content || '';
+      }
+
       const { data: draft, error } = await supabase
         .from('drafts')
         .insert({
-          research_session_id: sessionId,
-          content: `Exported ${type} session content`,
+          research_session_id: sessionId, // This might need adjustment depending on the data model
+          content: contentToExport,
           version: 1,
           user_id: user.id
         })
@@ -144,7 +173,7 @@ const AiPage = () => {
     }
   };
 
-  if (loading || isLoading) {
+  if (loading) {
     return (
       <Layout>
         <div className="flex h-screen items-center justify-center">

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { FiX, FiSave } from 'react-icons/fi';
-import AdvancedEditor from './AdvancedEditor';
+import AdvancedEditor from '@/components/editor/AdvancedEditor';
 
 // Full Screen Editor Modal
 const FullScreenEditor: React.FC<{

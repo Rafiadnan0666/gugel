@@ -18,8 +18,13 @@ const AITabModal: React.FC<{
   const [content, setContent] = useState(editingTab?.content || '');
   const [isFetching, setIsFetching] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      setAiAnalysis('');
+    }
     if (editingTab) {
       setUrl(editingTab.url);
       setTitle(editingTab.title || '');
@@ -29,13 +34,15 @@ const AITabModal: React.FC<{
       setTitle('');
       setContent('');
     }
-  }, [editingTab]);
+  }, [editingTab, isOpen]);
 
   const fetchWithAI = async (url: string) => {
     if (!url || !onAIAnalyze) return;
     
     try {
       setIsFetching(true);
+      setError(null);
+      setAiAnalysis('');
       if (!url.startsWith('http')) {
         url = 'https://' + url;
       }
@@ -45,9 +52,10 @@ const AITabModal: React.FC<{
       setContent(result.content);
       setAiAnalysis('AI has analyzed the content and extracted key information.');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI Analysis failed:', error);
-      setAiAnalysis('AI analysis failed. Please add content manually.');
+      setError(error.message || 'AI analysis failed. Please add content manually.');
+      setAiAnalysis('');
     } finally {
       setIsFetching(false);
     }
@@ -92,6 +100,12 @@ const AITabModal: React.FC<{
           </div>
         </div>
         
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800">
+            {error}
+          </div>
+        )}
+
         {aiAnalysis && (
           <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
             <p className="text-sm text-purple-800 flex items-center">
