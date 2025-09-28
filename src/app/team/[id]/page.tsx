@@ -461,6 +461,22 @@ export default function TeamPage({ params }: TeamPageProps) {
 
       if (error) throw error;
 
+      // Create notification for each team member
+      const notifications = teamMembers.map(member => ({
+        user_id: member.user_id,
+        type: 'team_chat_message',
+        message: `You have a new message in the team "${team?.name}" `,
+        read: false,
+      }));
+
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert(notifications);
+
+      if (notificationError) {
+        throw notificationError;
+      }
+
       setNewMessage('');
       setUnreadMessages(0);
       scrollToBottom();
@@ -513,6 +529,20 @@ export default function TeamPage({ params }: TeamPageProps) {
         });
 
       if (error) throw error;
+
+      // Create notification
+      const { error: notificationError } = await supabase
+        .from('notifications')
+        .insert({
+          user_id: userData.id,
+          type: 'team_invitation',
+          message: `You have been invited to join the team "${team?.name}" `,
+          read: false,
+        });
+
+      if (notificationError) {
+        throw notificationError;
+      }
 
       toast.success('Member invited successfully');
       setIsInviteModalOpen(false);

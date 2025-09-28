@@ -1,22 +1,15 @@
-"use client"
-import Layout from '@/components/Layout'
-import React, { useState, useEffect, useRef } from 'react'
-import { IChat_Session, ISessionMessage, IDraft } from '@/types/main.db'
-import { createClient } from '@supabase/supabase-js'
-import { useParams, useRouter } from 'next/navigation'
-import { FiSend, FiDownload, FiTrash2, FiEdit, FiArrowLeft } from 'react-icons/fi'
+'use client';
+import Layout from '@/components/Layout';
+import React, { useState, useEffect, useRef } from 'react';
+import { IChat_Session, ISessionMessage } from '@/types/main.db';
+import { createClient } from '@/utils/supabase/client';
+import { useParams, useRouter } from 'next/navigation';
+import { FiSend, FiDownload, FiTrash2, FiEdit, FiArrowLeft } from 'react-icons/fi';
+import useAuth from '@/hooks/useAuth';
+import AIResponse from '@/components/AIResponse';
+import { useAIService } from '@/hooks/useAIService';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
-interface ChatMessage {
-  id: string;
-  content: string;
-  sender: 'user' | 'ai';
-  created_at: Date;
-}
+const supabase = createClient();
 
 const ChatPage = () => {
   const params = useParams();
@@ -24,34 +17,32 @@ const ChatPage = () => {
   const sessionId = params.id as string;
   
   const [session, setSession] = useState<IChat_Session | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ISessionMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user, loading: authLoading } = useAuth();
+  const { chatWithAI } = useAIService();
 
   useEffect(() => {
-    if (sessionId) {
+    if (!authLoading && !user) {
+      router.push('/sign-in');
+    } else if (user && sessionId) {
       fetchSessionData();
       subscribeToMessages();
     }
-  }, [sessionId]);
+  }, [user, authLoading, sessionId, router]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
   const fetchSessionData = async () => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/sign-in');
-        return;
-      }
-
-      // Fetch session
       const { data: sessionData, error: sessionError } = await supabase
-        .from('chat_sessions')
+        .from('chat_sesssion')
         .select('*')
         .eq('id', sessionId)
         .eq('user_id', user.id)
@@ -60,7 +51,6 @@ const ChatPage = () => {
       if (sessionError) throw sessionError;
       setSession(sessionData);
 
-      // Fetch messages
       const { data: messagesData, error: messagesError } = await supabase
         .from('session_messages')
         .select('*')
@@ -80,14 +70,14 @@ const ChatPage = () => {
     const subscription = supabase
       .channel('messages')
       .on('postgres_changes', 
-        { 
+        {
           event: 'INSERT', 
           schema: 'public', 
           table: 'session_messages',
           filter: `chat_session_id=eq.${sessionId}`
         }, 
         (payload) => {
-          setMessages(prev => [...prev, payload.new as ChatMessage]);
+          setMessages(prev => [...prev, payload.new as ISessionMessage]);
         }
       )
       .subscribe();
@@ -102,20 +92,19 @@ const ChatPage = () => {
   };
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || isSending) return;
+    if (!newMessage.trim() || isSending || !user) return;
 
     setIsSending(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    const userMessageContent = newMessage;
+    setNewMessage('');
 
-      // Add user message
+    try {
       const { data: userMessage, error: userError } = await supabase
         .from('session_messages')
         .insert({
           session_id: sessionId,
           user_id: user.id,
-          content: newMessage,
+          content: userMessageContent,
           sender: 'user',
           chat_session_id: sessionId
         })
@@ -124,25 +113,20 @@ const ChatPage = () => {
 
       if (userError) throw userError;
 
-      setNewMessage('');
+      const aiResponse = await chatWithAI(userMessageContent, { tabs: [], drafts: [] });
 
-      // Simulate AI response (replace with actual AI service)
-      setTimeout(async () => {
-        const aiResponse = `This is a simulated response to: "${newMessage}". In a real application, this would connect to an AI service.`;
-        
-        const { data: aiMessage, error: aiError } = await supabase
-          .from('session_messages')
-          .insert({
-            session_id: sessionId,
-            content: aiResponse,
-            sender: 'ai',
-            chat_session_id: sessionId
-          })
-          .select()
-          .single();
+      const { data: aiMessage, error: aiError } = await supabase
+        .from('session_messages')
+        .insert({
+          session_id: sessionId,
+          content: aiResponse,
+          sender: 'ai',
+          chat_session_id: sessionId
+        })
+        .select()
+        .single();
 
-        if (aiError) throw aiError;
-      }, 1000);
+      if (aiError) throw aiError;
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -152,10 +136,8 @@ const ChatPage = () => {
   };
 
   const exportToDraft = async () => {
+    if (!user) return;
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
       const conversation = messages.map(msg => 
         `${msg.sender === 'user' ? 'User' : 'AI'}: ${msg.content}`
       ).join('\n\n');
@@ -184,7 +166,7 @@ const ChatPage = () => {
 
     try {
       const { error } = await supabase
-        .from('chat_sessions')
+        .from('chat_sesssion')
         .delete()
         .eq('id', sessionId);
 
@@ -209,7 +191,7 @@ const ChatPage = () => {
     }
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <Layout>
         <div className="flex h-screen items-center justify-center">
@@ -286,29 +268,26 @@ const ChatPage = () => {
               messages.map((message) => (
                 <div
                   key={message.id}
-                  className={`flex ${
+                  className={`flex ${ 
                     message.sender === 'user' ? 'justify-end' : 'justify-start'
                   }`}
                 >
-                  <div
-                    className={`max-w-2xl rounded-lg px-4 py-3 ${
-                      message.sender === 'user'
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
-                    }`}
-                  >
-                    <div className="whitespace-pre-wrap">{message.content}</div>
-                    <div
-                      className={`text-xs mt-2 ${
-                        message.sender === 'user'
-                          ? 'text-blue-100'
-                          : 'text-gray-500'
-                      }`}
-                    >
-                      {new Date(message.created_at).toLocaleTimeString()}
-                    </div>
-                  </div>
-                </div>
+                                    <div
+                                      className={`max-w-2xl w-full ${ 
+                                        message.sender === 'user' ? 'ml-auto' : ''
+                                      }`}
+                                    >
+                                      {message.sender === 'user' ? (
+                                        <div className="bg-blue-500 text-white rounded-lg px-4 py-3">
+                                          <div className="whitespace-pre-wrap">{message.content}</div>
+                                          <div className="text-xs mt-2 text-blue-100">
+                                            {new Date(message.created_at).toLocaleTimeString()}
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <AIResponse content={message.content} />
+                                      )}
+                                    </div>                </div>
               ))
             )}
             <div ref={messagesEndRef} />
