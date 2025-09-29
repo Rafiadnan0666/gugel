@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { FiBold, FiItalic, FiUnderline, FiList, FiAlignLeft, FiAlignCenter, FiAlignRight, FiLink2, FiOctagon, FiFileText, FiGlobe, FiRotateCw, FiTarget, FiCoffee, FiAward } from 'react-icons/fi';
+import { FiBold, FiItalic, FiUnderline, FiList, FiAlignLeft, FiAlignCenter, FiAlignRight, FiLink2, FiOctagon, FiFileText, FiGlobe, FiRotateCw, FiTarget, FiCoffee, FiAward, FiMinus, FiMessageSquare, FiCode } from 'react-icons/fi';
 import type { IProfile } from '@/types/main.db';
 
 // Advanced Collaborative Editor Component
@@ -68,8 +68,65 @@ const AdvancedEditor: React.FC<{
     { id: 'formalize', label: 'Formalize', icon: FiAward, description: 'Make more professional' }
   ];
 
+  const [showSlashCommand, setShowSlashCommand] = useState(false);
+  const [slashCommandQuery, setSlashCommandQuery] = useState('');
+
+  const slashCommands = [
+    { command: 'h1', label: 'Heading 1', action: () => formatText('formatBlock', '<h1>') },
+    { command: 'h2', label: 'Heading 2', action: () => formatText('formatBlock', '<h2>') },
+    { command: 'h3', label: 'Heading 3', action: () => formatText('formatBlock', '<h3>') },
+    { command: 'p', label: 'Paragraph', action: () => formatText('formatBlock', '<p>') },
+    { command: 'ul', label: 'Bulleted List', action: () => formatText('insertUnorderedList') },
+    { command: 'ol', label: 'Numbered List', action: () => formatText('insertOrderedList') },
+    { command: 'quote', label: 'Blockquote', action: () => formatText('formatBlock', '<blockquote>') },
+    { command: 'code', label: 'Code Block', action: () => formatText('formatBlock', '<pre>') },
+  ];
+
+  const filteredSlashCommands = slashCommands.filter(item => item.command.toLowerCase().includes(slashCommandQuery.toLowerCase()));
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === '/') {
+      setShowSlashCommand(true);
+    }
+    if (e.key === 'Escape') {
+      setShowSlashCommand(false);
+    }
+    if (showSlashCommand) {
+      if (e.key === 'Enter' && filteredSlashCommands.length > 0) {
+        e.preventDefault();
+        filteredSlashCommands[0].action();
+        setShowSlashCommand(false);
+        setSlashCommandQuery('');
+      } else if (e.key === 'Backspace') {
+        setSlashCommandQuery(prev => prev.slice(0, -1));
+      } else if (e.key.length === 1) {
+        setSlashCommandQuery(prev => prev + e.key);
+      }
+    }
+  };
+
   return (
     <div className="border border-gray-300 rounded-lg overflow-hidden relative">
+      {showSlashCommand && (
+        <div className="absolute top-16 left-4 z-20 bg-white border border-gray-200 rounded-lg shadow-xl w-64 animate-fade-in-down-fast">
+          <div className="p-2 max-h-64 overflow-y-auto">
+            {filteredSlashCommands.map(item => (
+              <button
+                key={item.command}
+                onClick={() => {
+                  item.action();
+                  setShowSlashCommand(false);
+                  setSlashCommandQuery('');
+                }}
+                className="w-full flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors text-left"
+              >
+                <div className="font-medium text-gray-900 text-sm">/{item.command}</div>
+                <div className="text-xs text-gray-600">{item.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {showAITools && (
         <div className="absolute top-16 right-4 z-20 bg-white border border-gray-200 rounded-lg shadow-xl w-64 animate-fade-in-down-fast">
           <div className="p-3 border-b border-gray-200">
@@ -152,9 +209,31 @@ const AdvancedEditor: React.FC<{
           type="button" 
           onClick={() => formatText('underline')}
           className="p-2 rounded hover:bg-gray-200 transition-colors"
-          title="Underline"
+       
+           
+          title="Strikethrough"
         >
-          <FiUnderline className="w-4 h-4" />
+          <FiMinus className="w-4 h-4" />
+        </button>
+        
+        <div className="w-px h-6 bg-gray-300 mx-1"></div>
+
+        <button 
+          type="button" 
+          onClick={() => formatText('formatBlock', '<blockquote>')}
+          className="p-2 rounded hover:bg-gray-200 transition-colors"
+          title="Blockquote"
+        >
+          <FiMessageSquare className="w-4 h-4" />
+        </button>
+        
+        <button 
+          type="button" 
+          onClick={() => formatText('formatBlock', '<pre>')}
+          className="p-2 rounded hover:bg-gray-200 transition-colors"
+          title="Code Block"
+        >
+          <FiCode className="w-4 h-4" />
         </button>
         
         <div className="w-px h-6 bg-gray-300 mx-1"></div>
@@ -237,6 +316,7 @@ const AdvancedEditor: React.FC<{
         contentEditable={!disabled}
         onInput={(e) => onChange(e.currentTarget.innerHTML)}
         onPaste={handlePaste}
+        onKeyDown={handleKeyDown}
         className="min-h-96 p-4 focus:outline-none prose prose-sm max-w-none bg-white"
         dangerouslySetInnerHTML={{ __html: value || placeholder }}
         style={{ 

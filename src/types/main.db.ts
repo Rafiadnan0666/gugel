@@ -29,6 +29,7 @@ export interface ITab {
   id: string;
   session_id: string;
   url: string;
+  user_id?: string;
   title?: string;
   content?: string;
   created_at: Date;
@@ -48,6 +49,7 @@ export interface IDraft {
   content: string;
   version: number;
   created_at: Date;
+  updated_at: Date;
   user_id?: string;
 }
 export interface ISessionMessage {
@@ -88,7 +90,7 @@ export interface ITeamMessage {
   profiles: IProfile;
 }
 export interface INotification {
-  id: string;
+  id: number;
   user_id: string;
   type: string;
   message: string;
@@ -97,8 +99,8 @@ export interface INotification {
   updated_at: Date;
 }
 
-export interface IChat_Session {
-  id: string;
+export interface IChatSession {
+  id: number;
   user_id: string;
   title: string;
   description: string;
@@ -117,6 +119,3 @@ export interface IOfflineCache {
   team_messages: ITeamMessage[];
   last_synced: Date;
 }
-
-
-
