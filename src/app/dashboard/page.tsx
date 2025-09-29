@@ -4,12 +4,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import type { IResearchSession, ITab, IDraft } from '@/types/main.db';
-import { 
-  FiPlus, FiUsers, FiUser, FiEdit2, FiTrash2, FiMail, FiBell, 
-  FiMessageSquare, FiSearch, FiX, FiExternalLink, FiImage,
-  FiBarChart2, FiClock, FiBook, FiStar, FiZap, FiCpu, FiChevronRight,
-  FiDownload, FiSend, FiPaperclip, FiMoreVertical, FiFilter
-} from 'react-icons/fi';
+import ActivityChart from '@/components/dashboard/ActivityChart';
 
 // AI Service Hook
 const useAIService = () => {
@@ -104,10 +99,10 @@ export default function Dashboard() {
 
       const sessionIds = sessionsData ? sessionsData.map(s => s.id) : [];
 
-      const [tabsResult, draftsCountResult, recentDraftsResult] = await Promise.all([
-        sessionIds.length > 0 ? supabase.from('tabs').select('id', { count: 'exact' }).in('session_id', sessionIds) : Promise.resolve({ count: 0 }),
-        sessionIds.length > 0 ? supabase.from('drafts').select('id', { count: 'exact' }).in('session_id', sessionIds) : Promise.resolve({ count: 0 }),
-        sessionIds.length > 0 ? supabase.from('drafts').select('*').in('session_id', sessionIds).order('created_at', { ascending: false }).limit(3) : Promise.resolve({ data: [] })
+      const [tabsResult, draftsResult, recentDraftsResult] = await Promise.all([
+        sessionIds.length > 0 ? supabase.from('tabs').select('*').in('session_id', sessionIds) : Promise.resolve({ data: [] }),
+        sessionIds.length > 0 ? supabase.from('drafts').select('*').in('research_session_id', sessionIds) : Promise.resolve({ data: [] }),
+        sessionIds.length > 0 ? supabase.from('drafts').select('*').in('research_session_id', sessionIds).order('created_at', { ascending: false }).limit(3) : Promise.resolve({ data: [] })
       ]);
 
       setSessions(sessionsData || []);
@@ -116,10 +111,41 @@ export default function Dashboard() {
 
       setStats({
         totalSessions: sessionsData?.length || 0,
-        totalTabs: tabsResult.count || 0,
-        totalDrafts: draftsCountResult.count || 0,
+        totalTabs: tabsResult.data?.length || 0,
+        totalDrafts: draftsResult.data?.length || 0,
         lastActive: sessionsData?.[0]?.created_at || ''
       });
+
+      const processActivityData = () => {
+        const activityByDate = new Map<string, { sessions: number, tabs: number, drafts: number }>();
+
+        sessionsData?.forEach(session => {
+          const date = new Date(session.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          if (!activityByDate.has(date)) {
+            activityByDate.set(date, { sessions: 0, tabs: 0, drafts: 0 });
+          }
+          activityByDate.get(date)!.sessions++;
+        });
+
+        tabsResult.data?.forEach(tab => {
+          const date = new Date(tab.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          if (activityByDate.has(date)) {
+            activityByDate.get(date)!.tabs++;
+          }
+        });
+
+        draftsResult.data?.forEach(draft => {
+          const date = new Date(draft.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          if (activityByDate.has(date)) {
+            activityByDate.get(date)!.drafts++;
+          }
+        });
+
+        const chartData = Array.from(activityByDate.entries()).map(([name, data]) => ({ name, ...data }));
+        setActivityData(chartData);
+      };
+
+      processActivityData();
 
       if (aiStatus === 'ready' && sessionsData?.length) {
         generateAISuggestions(sessionsData);
@@ -143,10 +169,9 @@ export default function Dashboard() {
   };
 
   const generateAISuggestions = async (sessions: IResearchSession[]) => {
-    const prompt = `Analyze these research sessions and provide 3 actionable insights:
-${sessions.map(s => `- "${s.title}"`).join('\n')}`;
+    const prompt = `You are a world-class research assistant. Based on the following research sessions, provide 3 actionable insights or suggestions for the user. The suggestions should be specific, concise, and helpful.\n\nResearch Sessions:\n${sessions.map(s => `- "${s.title}"`).join('\n')}`;
     const result = await promptAI(prompt);
-    const suggestions = result.split('\n').filter(line => line.trim().match(/^[•\-]\s+|^\d+\.\s+/)).map(line => line.replace(/^[•\-]\s+|^\d+\.\s+/, '').trim());
+    const suggestions = result.split('\n').filter(line => line.trim().length > 0 && (line.trim().startsWith('*') || line.trim().startsWith('-') || line.trim().match(/^\d+\./))).map(line => line.trim().substring(line.indexOf(' ') + 1));
     setAiSuggestions(suggestions.slice(0, 3));
   };
 
@@ -176,6 +201,21 @@ ${sessions.map(s => `- "${s.title}"`).join('\n')}`;
     return <Layout><div className="flex items-center justify-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div></Layout>;
   }
 
+  const [activityData, setActivityData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const processActivityData = () => {
+      const data = sessions.map(session => ({
+        name: new Date(session.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        sessions: 1,
+        tabs: 0,
+        drafts: 0,
+      }));
+      setActivityData(data);
+    };
+    processActivityData();
+  }, [sessions]);
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -185,9 +225,13 @@ ${sessions.map(s => `- "${s.title}"`).join('\n')}`;
             <p className="text-muted-foreground">Welcome back, here's a summary of your research.</p>
           </div>
           <div className="flex gap-2">
-            <button onClick={createNewSession} className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2"><FiPlus /> New Session</button>
-            <button onClick={() => setShowChat(true)} className="bg-secondary text-secondary-foreground px-4 py-2 rounded-lg hover:bg-secondary/90 flex items-center gap-2"><FiMessageSquare /> AI Assistant</button>
+            <button onClick={createNewSession} className="bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 flex items-center gap-2" title="Create a new research session"><FiPlus /> New Session</button>
+            <button onClick={() => setShowChat(true)} className="bg-secondary text-secondary-foreground px-4 py-2 rounded-lg hover:bg-secondary/90 flex items-center gap-2" title="Open the AI assistant"><FiMessageSquare /> AI Assistant</button>
           </div>
+        </div>
+
+        <div className="mb-8">
+          <ActivityChart data={activityData} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -246,15 +290,15 @@ ${sessions.map(s => `- "${s.title}"`).join('\n')}`;
       </div>
 
       {showChat && (
-        <div className="fixed bottom-4 right-4 w-96 bg-card rounded-2xl shadow-2xl border border-border/20 z-50 flex flex-col">
+        <div className="fixed bottom-4 right-4 w-[450px] bg-card rounded-2xl shadow-2xl border border-border/20 z-50 flex flex-col">
           <div className="flex justify-between items-center p-4 border-b border-border/20">
             <h3 className="font-semibold">AI Assistant</h3>
-            <button onClick={() => setShowChat(false)}><FiX /></button>
+            <button onClick={() => setShowChat(false)} className="p-1 rounded-full hover:bg-accent"><FiX /></button>
           </div>
-          <div className="h-80 overflow-y-auto p-4 space-y-4">
+          <div className="h-96 overflow-y-auto p-4 space-y-4">
             {chatMessages.map(msg => (
               <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-3 rounded-lg max-w-xs ${msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{msg.content}</div>
+                <div className={`p-3 rounded-lg max-w-sm ${msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{msg.content}</div>
               </div>
             ))}
             <div ref={chatEndRef} />

@@ -857,7 +857,9 @@ const AIChat: React.FC<{
 const InviteCollaboratorForm: React.FC<{
   sessionId: string;
   onInviteSent: () => void;
-}> = ({ sessionId, onInviteSent }) => {
+  editedTitle: string;
+  session: IResearchSession | null;
+}> = ({ sessionId, onInviteSent, editedTitle, session }) => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'editor' | 'viewer'>('viewer');
   const [isLoading, setIsLoading] = useState(false);
@@ -918,6 +920,7 @@ const InviteCollaboratorForm: React.FC<{
           type: 'session_invitation',
           message: `You have been invited to collaborate on the session "${editedTitle || session?.title}" `,
           read: false,
+          updated_at: new Date().toISOString(),
         });
 
       if (notificationError) {
@@ -1140,7 +1143,7 @@ export default function AdvancedSessionPage() {
         .insert([{
           tab_id: tabId,
           summary: summaryText,
-          created_at: new Date()
+          created_at: new Date().toISOString()
         }])
         .select()
         .single();
@@ -1166,7 +1169,7 @@ export default function AdvancedSessionPage() {
           research_session_id: sessionId,
           content: currentDraft,
           version: draftVersion,
-          created_at: new Date()
+          created_at: new Date().toISOString()
         }])
         .select()
         .single();
@@ -1240,6 +1243,7 @@ const aiMessage: ISessionMessage = {
           type: 'session_chat_message',
           message: `You have a new message in the session "${session?.title}" `,
           read: false,
+          updated_at: new Date().toISOString(),
         });
 
       if (notificationError) {
@@ -2031,8 +2035,12 @@ finally {
         title="Invite Collaborators"
         size="md"
       >
-        <InviteCollaboratorForm sessionId={sessionId} onInviteSent={() => setModal({ type: '' })} />
-      </Modal>
+                      <InviteCollaboratorForm 
+                        sessionId={sessionId} 
+                        onInviteSent={() => setModal({ type: '' })} 
+                        editedTitle={editedTitle}
+                        session={session}
+                      />      </Modal>
 
       {/* Success/Error Modals */}
       <Modal
