@@ -1,7 +1,7 @@
 'use client';
 import Layout from '@/components/Layout';
 import React, { useState, useEffect, useRef } from 'react';
-import { IChat_Session, ISessionMessage } from '@/types/main.db';
+import { IChatSession, ISessionMessage } from '@/types/main.db';
 import { createClient } from '@/utils/supabase/client';
 import { useParams, useRouter } from 'next/navigation';
 import { FiSend, FiDownload, FiTrash2, FiEdit, FiArrowLeft } from 'react-icons/fi';
@@ -16,7 +16,7 @@ const ChatPage = () => {
   const router = useRouter();
   const sessionId = params.id as string;
   
-  const [session, setSession] = useState<IChat_Session | null>(null);
+  const [session, setSession] = useState<IChatSession | null>(null);
   const [messages, setMessages] = useState<ISessionMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -145,7 +145,7 @@ const ChatPage = () => {
       const { data: draft, error } = await supabase
         .from('drafts')
         .insert({
-          research_session_id: sessionId,
+          research_session_id: null,
           content: conversation,
           version: 1,
           user_id: user.id
@@ -180,7 +180,7 @@ const ChatPage = () => {
   const updateSessionTitle = async (newTitle: string) => {
     try {
       const { error } = await supabase
-        .from('chat_sessions')
+        .from('chat_sesssion')
         .update({ title: newTitle })
         .eq('id', sessionId);
 

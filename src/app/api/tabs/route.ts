@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
   const { data, error } = await supabase
     .from('tabs')
-    .insert([{ session_id, url, title, content }])
+    .insert([{ session_id, url, title, content, user_id: user.id }])
     .select();
 
   if (error) {

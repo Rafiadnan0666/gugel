@@ -461,12 +461,13 @@ export default function TeamPage({ params }: TeamPageProps) {
 
       if (error) throw error;
 
-      // Create notification for each team member
+      
       const notifications = teamMembers.map(member => ({
         user_id: member.user_id,
         type: 'team_chat_message',
         message: `You have a new message in the team "${team?.name}" `,
         read: false,
+        updated_at: new Date().toISOString(),
       }));
 
       const { error: notificationError } = await supabase
@@ -538,6 +539,7 @@ export default function TeamPage({ params }: TeamPageProps) {
           type: 'team_invitation',
           message: `You have been invited to join the team "${team?.name}" `,
           read: false,
+          updated_at: new Date().toISOString(),
         });
 
       if (notificationError) {
@@ -735,7 +737,7 @@ export default function TeamPage({ params }: TeamPageProps) {
 
             {/* Navigation */}
             <div className="flex space-x-8 border-b">
-              {(['overview', 'sessions', 'members', 'chat', 'analytics'] as const).map(tab => (
+              {(['overview', 'sessions', 'members', 'chat'] as const).map(tab => (
                 <button
                   key={tab}
                   className={`pb-3 px-1 font-medium border-b-2 transition-colors relative ${
@@ -758,7 +760,7 @@ export default function TeamPage({ params }: TeamPageProps) {
         </div>
 
         {/* Real-time Events Sidebar */}
-        <div className="fixed right-4 top-20 w-80 bg-white rounded-lg border shadow-lg z-40 max-h-96 overflow-y-auto">
+        {/* <div className="fixed right-4 top-20 w-80 bg-white rounded-lg border shadow-lg z-40 max-h-96 overflow-y-auto">
           <div className="p-4 border-b">
             <h3 className="font-semibold flex items-center">
               <FiActivity className="mr-2" /> Live Activity
@@ -789,14 +791,14 @@ export default function TeamPage({ params }: TeamPageProps) {
               <p className="p-4 text-gray-500 text-center">No recent activity</p>
             )}
           </div>
-        </div>
+        </div> */}
 
         {/* Main Content */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {activeTab === 'overview' && (
             <div className="space-y-8">
               {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-lg border shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
@@ -827,7 +829,7 @@ export default function TeamPage({ params }: TeamPageProps) {
                   </div>
                 </div>
                 
-                <div className="bg-white p-6 rounded-lg border shadow-sm">
+                {/* <div className="bg-white p-6 rounded-lg border shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Engagement</p>
@@ -837,7 +839,7 @@ export default function TeamPage({ params }: TeamPageProps) {
                     </div>
                     <FiActivity className="text-orange-500 text-xl" />
                   </div>
-                </div>
+                </div> */}
               </div>
 
               {/* Recent Activity */}
@@ -1005,8 +1007,8 @@ export default function TeamPage({ params }: TeamPageProps) {
               </div>
               
               <div ref={messagesEndRef} className="flex-1 overflow-y-auto p-4 space-y-4">
-                {teamMessages.map(message => (
-                  <div key={message.id} className="flex space-x-3">
+               {teamMessages.map((message, idx) => (
+                   <div key={`${message.id}-${idx}`} className="flex space-x-3">
                     <div className="w-8 h-8 bg-gray-300 rounded-full flex-shrink-0 flex items-center justify-center">
                       {/* <FiUser className="text-gray-600 text-sm" /> */}
                       <img className="w-8 h-8 rounded-full" src={message.profiles?.avatar_url || '/default-avatar.png'} alt="" />

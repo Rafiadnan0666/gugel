@@ -1,7 +1,7 @@
 "use client"
 import Layout from '@/components/Layout'
 import React, { useState, useEffect } from 'react'
-import { IChat_Session, IResearchSession, IDraft } from '@/types/main.db'
+import { IChatSession, IResearchSession, IDraft } from '@/types/main.db'
 import { createClient } from '@/utils/supabase/client';
 import { useRouter } from 'next/navigation'
 import { FiPlus, FiMessageSquare, FiEdit, FiDownload, FiTrash2 } from 'react-icons/fi'
@@ -10,7 +10,7 @@ import useAuth from '@/hooks/useAuth'
 const supabase = createClient();
 
 const AiPage = () => {
-  const [chatSessions, setChatSessions] = useState<IChat_Session[]>([]);
+  const [chatSessions, setChatSessions] = useState<IChatSession[]>([]);
   const [researchSessions, setResearchSessions] = useState<IResearchSession[]>([]);
   const [activeTab, setActiveTab] = useState<'chat' | 'research'>('chat');
   const router = useRouter();
@@ -157,7 +157,7 @@ const { data: newSession, error } = await supabase
       const { data: draft, error } = await supabase
         .from('drafts')
         .insert({
-          research_session_id: sessionId, // This might need adjustment depending on the data model
+          research_session_id: null,
           content: contentToExport,
           version: 1,
           user_id: user.id

@@ -102,7 +102,7 @@ export default function DraftEditPage() {
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
             pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`${(draft?.research_sessions as any)?.title || 'draft'}.pdf`);
+            pdf.save(`${(draft?.research_session_id as any)?.title || 'draft'}.pdf`);
           });
         });
       });
@@ -127,7 +127,7 @@ export default function DraftEditPage() {
             <button onClick={() => router.push('/drafts')} className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-2">
               <FiArrowLeft /> Back to Drafts
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">{(draft?.research_sessions as any)?.title || 'Edit Draft'}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{(draft?.research_session_id as any)?.title || 'Edit Draft'}</h1>
             <p className="text-sm text-gray-500">Version {draft?.version}</p>
           </div>
           <div className="flex items-center gap-3">
