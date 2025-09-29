@@ -29,6 +29,7 @@ export interface ITab {
   id: string;
   session_id: string;
   url: string;
+  user_id?: string;
   title?: string;
   content?: string;
   created_at: Date;

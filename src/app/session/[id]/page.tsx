@@ -1069,6 +1069,7 @@ export default function AdvancedSessionPage() {
           url: tabData.url,
           title: tabData.title,
           content: tabData.content,
+          user_id: userProfile?.id,
           // favicon: tabData.favicon
         }])
         .select()

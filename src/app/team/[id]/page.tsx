@@ -798,7 +798,7 @@ export default function TeamPage({ params }: TeamPageProps) {
           {activeTab === 'overview' && (
             <div className="space-y-8">
               {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white p-6 rounded-lg border shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
@@ -829,7 +829,7 @@ export default function TeamPage({ params }: TeamPageProps) {
                   </div>
                 </div>
                 
-                <div className="bg-white p-6 rounded-lg border shadow-sm">
+                {/* <div className="bg-white p-6 rounded-lg border shadow-sm">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-gray-600">Engagement</p>
@@ -839,7 +839,7 @@ export default function TeamPage({ params }: TeamPageProps) {
                     </div>
                     <FiActivity className="text-orange-500 text-xl" />
                   </div>
-                </div>
+                </div> */}
               </div>
 
               {/* Recent Activity */}
