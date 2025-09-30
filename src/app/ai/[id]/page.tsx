@@ -25,6 +25,8 @@ const ChatPage = () => {
   const { user, loading: authLoading } = useAuth();
   const { chatWithAI } = useAIService();
 
+  console.log('Session ID:', sessionId);
+
   useEffect(() => {
     if (!authLoading && !user) {
       router.push('/sign-in');
@@ -104,7 +106,7 @@ const { data: userMessage, error: userError } = await supabase
   .from('session_messages')
   .insert({
     id: crypto.randomUUID(), // <-- Add this line
-    session_id: sessionId,
+    session_id: null,
     user_id: user.id,
     content: userMessageContent,
     sender: 'user',
@@ -123,7 +125,7 @@ const { data: aiMessage, error: aiError } = await supabase
   .from('session_messages')
   .insert({
     id: crypto.randomUUID(), // <-- Add this line
-    session_id: sessionId,
+    session_id: null,
     content: aiResponse,
     sender: 'ai',
     chat_session_id: sessionId

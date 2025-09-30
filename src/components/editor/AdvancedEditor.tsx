@@ -17,6 +17,13 @@ const AdvancedEditor: React.FC<{
   const editorRef = useRef<HTMLDivElement>(null);
   const [isAILoading, setIsAILoading] = useState(false);
   const [showAITools, setShowAITools] = useState(false);
+
+  useEffect(() => {
+    if (editorRef.current && value !== editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
+
   
   const formatText = (command: string, value?: string) => {
     document.execCommand(command, false, value);
@@ -318,7 +325,6 @@ const AdvancedEditor: React.FC<{
         onPaste={handlePaste}
         onKeyDown={handleKeyDown}
         className="min-h-96 p-4 focus:outline-none prose prose-sm max-w-none bg-white"
-        dangerouslySetInnerHTML={{ __html: value || placeholder }}
         style={{ 
           fontFamily: "'Inter', sans-serif",
           lineHeight: '1.6',

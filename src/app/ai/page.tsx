@@ -121,7 +121,7 @@ const { data: newSession, error } = await supabase
       if (error) throw error;
       
       if (type === 'chat') {
-        setChatSessions(chatSessions.filter(session => session.id !== sessionId));
+        setChatSessions(chatSessions.filter(session => String(session.id) !== sessionId));
       } else {
         setResearchSessions(researchSessions.filter(session => session.id !== sessionId));
       }
