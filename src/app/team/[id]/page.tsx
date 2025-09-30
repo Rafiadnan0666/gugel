@@ -73,41 +73,7 @@ const useAIService = () => {
   return { aiStatus, promptAI };
 };
 
-interface TeamPageProps {
-  params: { id: string };
-}
-
-interface RealTimeEvent {
-  type: 'member_joined' | 'member_left' | 'message_sent' | 'session_created' | 'session_updated';
-  data: any;
-  timestamp: Date;
-  user?: IProfile;
-}
-
-interface AIChatMessage {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: Date;
-  user_id?: string;
-}
-
-interface PresenceUser {
-  user_id: string;
-  profile: IProfile;
-  last_seen: Date;
-  status: 'online' | 'idle' | 'offline';
-}
-
-interface AnalyticsData {
-  sessionsCreated: number;
-  messagesSent: number;
-  activeMembers: number;
-  engagementRate: number;
-  weeklyActivity: { day: string; sessions: number; messages: number }[];
-}
-
-export default function TeamPage({ params }: TeamPageProps) {
+export default function TeamPage() {
   const router = useRouter();
   const { id: teamId } = useParams();
   const supabase = createClient();

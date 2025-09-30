@@ -33,81 +33,10 @@ import {
   FiAward
 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
+import { useAIService } from '@/hooks/useAIService';
+import { useOfflineCache } from '@/hooks/useOfflineCache';
 
-// Enhanced AI Service Hook
-const useAIService = () => {
-  const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
 
-  const promptAI = async (prompt: string, context?: any) => {
-    try {
-      // Simulate AI processing with enhanced context awareness
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 800));
-      
-      const sessionCount = context?.sessions?.length || 0;
-      const tabCount = context?.tabs?.length || 0;
-      const draftCount = context?.drafts?.length || 0;
-
-      if (prompt.toLowerCase().includes('research') || prompt.toLowerCase().includes('suggest')) {
-        return `Based on your ${sessionCount} research sessions and ${tabCount} collected tabs, I recommend:\n\n1. **Focus on synthesis**: Group similar research findings from your ${draftCount} drafts\n2. **Expand coverage**: Consider exploring adjacent topics to fill knowledge gaps\n3. **Collaborate**: Share insights with team members for diverse perspectives`;
-      } else if (prompt.toLowerCase().includes('analyze') || prompt.toLowerCase().includes('trend')) {
-        return `Analysis of your research patterns:\n\n• Session frequency: ${sessionCount > 5 ? 'Consistent' : 'Developing'} research habit\n• Content depth: ${tabCount > 20 ? 'Comprehensive' : 'Growing'} coverage\n• Output quality: ${draftCount > 3 ? 'Productive' : 'Emerging'} writing practice`;
-      } else if (prompt.toLowerCase().includes('improve') || prompt.toLowerCase().includes('better')) {
-        return `To enhance your research workflow:\n\n1. **Systematic tagging**: Categorize sessions by topic or methodology\n2. **Regular reviews**: Schedule weekly synthesis sessions\n3. **Template usage**: Create reusable research templates for consistency\n4. **Peer feedback**: Share drafts for collaborative improvement`;
-      } else {
-        return `I've analyzed your research portfolio of ${sessionCount} sessions and ${draftCount} drafts. Your work shows promising depth. Consider establishing clearer research questions for future sessions to maximize insights.`;
-      }
-    } catch (error) {
-      return "I apologize, but I'm experiencing technical difficulties. Please try again later.";
-    }
-  };
-
-  // Initialize AI service
-  useEffect(() => {
-    const initializeAI = async () => {
-      try {
-        // Check for browser AI capabilities
-        if ((window as any).ai && (window as any).ai.languageModel) {
-          setAiStatus('ready');
-        } else {
-          setAiStatus('unavailable');
-        }
-      } catch (err) {
-        setAiStatus('error');
-      }
-    };
-
-    initializeAI();
-  }, []);
-
-  return { aiStatus, promptAI };
-};
-
-// Real-time Data Hook
-const useRealtimeData = () => {
-  const [isOnline, setIsOnline] = useState(true);
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
-
-  useEffect(() => {
-    const handleOnline = () => {
-      setIsOnline(true);
-      setLastUpdate(new Date());
-    };
-    
-    const handleOffline = () => {
-      setIsOnline(false);
-    };
-
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  return { isOnline, lastUpdate };
-};
 
 interface ChatMessage {
   id: string;
@@ -165,7 +94,7 @@ export default function Dashboard() {
   const router = useRouter();
   const supabase = createClient();
   const { aiStatus, promptAI } = useAIService();
-  const { isOnline, lastUpdate } = useRealtimeData();
+  const { isOnline, lastUpdate, saveData, loadData } = useOfflineCache();
 
   // Load dashboard data
   const loadDashboardData = useCallback(async () => {

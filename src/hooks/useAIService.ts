@@ -1,21 +1,45 @@
-'use client';
-
-import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client';
+import { useEffect, useState } from 'react';
 import type { ITab, IDraft } from '@/types/main.db';
 
 // Advanced AI Service with Language Model Integration
 export const useAIService = () => {
   const [aiSession, setAiSession] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
-  const [useServerAI, setUseServerAI] = useState(false);
+  const supabase = createClient();
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (data) {
+        setUser(data.user);
+      }
+    }
+    getUser();
+  }, [supabase]);
+
+  const traceAIAction = async (type: string, prompt: string, response: string) => {
+    if (!user) return;
+
+    try {
+      await supabase.from('ai_traces').insert({
+        user_id: user.id,
+        type,
+        prompt,
+        response,
+      });
+    } catch (error) {
+      console.error('Error tracing AI action:', error);
+    }
+  };
 
   useEffect(() => {
     const initializeAI = async () => {
       try {
         if (!(window as any).LanguageModel) {
-          console.log("LanguageModel API not found, falling back to server-side AI.");
-          setUseServerAI(true);
-          setAiStatus('ready');
+          console.error("LanguageModel API not found.");
+          setAiStatus('unavailable');
           return;
         }
 
@@ -58,36 +82,17 @@ export const useAIService = () => {
   }, []);
 
   const promptAI = async (prompt: string, type: string = 'summarize') => {
-    if (useServerAI) {
-      try {
-        const response = await fetch('/api/ai/prompt', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ prompt, type }),
-        });
-        if (!response.ok) {
-          throw new Error('Server AI response was not ok.');
-        }
-        const data = await response.json();
-        return data.response;
-      } catch (error) {
-        console.error("Error prompting server-side AI:", error);
-        return "Error from server-side AI";
-      }
-    } else {
-      if (!aiSession) {
-        console.error("AI session not ready");
-        return "AI not available";
-      }
-      try {
-        const result = await aiSession.prompt(prompt);
-        return result;
-      } catch (error) {
-        console.error("Error prompting AI:", error);
-        return "Error from AI";
-      }
+    if (aiStatus !== 'ready' || !aiSession) {
+      console.error("AI session not ready");
+      return "AI not available";
+    }
+    try {
+      const result = await aiSession.prompt(prompt);
+      await traceAIAction(type, prompt, result);
+      return result;
+    } catch (error) {
+      console.error("Error prompting AI:", error);
+      return "Error from AI";
     }
   };
 

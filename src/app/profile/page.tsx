@@ -14,6 +14,7 @@ interface EditProfileState {
   full_name: string;
   avatar_url: string;
   email: string;
+  settings: Record<string, any>;
 }
 
 export default function ProfilePage() {
@@ -112,6 +113,7 @@ setAuthUser({
       full_name: profile.full_name ?? '',
       avatar_url: profile.avatar_url ?? '',
       email: profile.email ?? '',
+      settings: profile.settings ?? {},
     });
     setSaveError(null);
     setShowEditModal(true);
@@ -127,6 +129,7 @@ setAuthUser({
           full_name: editState.full_name.trim(),
           avatar_url: editState.avatar_url.trim(),
           email: editState.email.trim(),
+          settings: editState.settings,
           updated_at: new Date().toISOString(),
         })
         .eq('id', authUser.id);
@@ -180,6 +183,13 @@ setAuthUser({
                 >
                   <FiEdit2 /> Edit Profile
                 </button>
+              </div>
+
+              <div className="mt-4 text-left">
+                <h3 className="text-lg font-semibold">Settings</h3>
+                <pre className="text-sm bg-gray-100 p-2 rounded">
+                  {JSON.stringify(profile?.settings, null, 2)}
+                </pre>
               </div>
             </div>
           </aside>
@@ -259,6 +269,26 @@ setAuthUser({
                     onChange={(e) => setEditState({ ...editState, email: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Your email address"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="settings" className="block text-sm font-medium text-gray-700 mb-1">
+                    Settings (JSON)
+                  </label>
+                  <textarea
+                    id="settings"
+                    value={JSON.stringify(editState.settings, null, 2)}
+                    onChange={(e) => {
+                      try {
+                        setEditState({ ...editState, settings: JSON.parse(e.target.value) });
+                      } catch (error) {
+                        // handle invalid json
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter settings as JSON"
+                    rows={5}
                   />
                 </div>
               </div>

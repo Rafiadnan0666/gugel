@@ -121,13 +121,19 @@ const { data: newSession, error } = await supabase
       if (error) throw error;
       
       if (type === 'chat') {
-        setChatSessions(chatSessions.filter(session => session.id !== sessionId));
+        setChatSessions(chatSessions.filter(session => String(session.id) !== sessionId));
       } else {
         setResearchSessions(researchSessions.filter(session => session.id !== sessionId));
       }
-    } catch (error) {
-      console.error('Error deleting session:', error);
-    }
+
+} catch (error) {
+  if (error instanceof Error) {
+    console.error('Error deleting session:', error.message, error.stack);
+  } else {
+    console.error('Error deleting session:', JSON.stringify(error));
+  }
+}
+
   };
 
   const exportToDraft = async (sessionId: string, type: 'chat' | 'research') => {
