@@ -99,38 +99,50 @@ const ChatPage = () => {
     setNewMessage('');
 
     try {
-      const { data: userMessage, error: userError } = await supabase
-        .from('session_messages')
-        .insert({
-          session_id: sessionId,
-          user_id: user.id,
-          content: userMessageContent,
-          sender: 'user',
-          chat_session_id: sessionId
-        })
-        .select()
-        .single();
+    
+const { data: userMessage, error: userError } = await supabase
+  .from('session_messages')
+  .insert({
+    id: crypto.randomUUID(), // <-- Add this line
+    session_id: sessionId,
+    user_id: user.id,
+    content: userMessageContent,
+    sender: 'user',
+    chat_session_id: sessionId
+  })
+  .select()
+  .single();
+
 
       if (userError) throw userError;
 
       const aiResponse = await chatWithAI(userMessageContent, { tabs: [], drafts: [] });
 
-      const { data: aiMessage, error: aiError } = await supabase
-        .from('session_messages')
-        .insert({
-          session_id: sessionId,
-          content: aiResponse,
-          sender: 'ai',
-          chat_session_id: sessionId
-        })
-        .select()
-        .single();
+   
+const { data: aiMessage, error: aiError } = await supabase
+  .from('session_messages')
+  .insert({
+    id: crypto.randomUUID(), // <-- Add this line
+    session_id: sessionId,
+    content: aiResponse,
+    sender: 'ai',
+    chat_session_id: sessionId
+  })
+  .select()
+  .single();
+
 
       if (aiError) throw aiError;
 
-    } catch (error) {
-      console.error('Error sending message:', error);
-    } finally {
+} catch (error) {
+  if (error instanceof Error) {
+    console.error('Error sending message:', error.message, error.stack);
+  } else {
+    console.error('Error sending message:', JSON.stringify(error));
+  }
+}
+
+ finally {
       setIsSending(false);
     }
   };

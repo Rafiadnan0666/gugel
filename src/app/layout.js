@@ -17,6 +17,7 @@ export default function RootLayout({ children }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="google-adsense-account" content="ca-pub-6910980494327419" />
+        <link rel="manifest" href="/manifest.ts" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
         {children}
@@ -32,6 +33,19 @@ export default function RootLayout({ children }) {
             function gtag(){dataLayer.push(arguments);}
             gtag('js', new Date());
             gtag('config', 'G-NHXS030H6D');
+          `}
+        </Script>
+        <Script id="sw-registration" strategy="afterInteractive">
+          {`
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                  console.log('Service Worker registered with scope:', registration.scope);
+                }).catch(error => {
+                  console.log('Service Worker registration failed:', error);
+                });
+              });
+            }
           `}
         </Script>
       </body>
