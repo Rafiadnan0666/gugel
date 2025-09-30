@@ -119,3 +119,23 @@ export interface IOfflineCache {
   team_messages: ITeamMessage[];
   last_synced: Date;
 }
+
+export interface IAITrace {
+  id: string;
+  user_id: string;
+  session_id?: string;
+  type: string;
+  prompt: string;
+  response: string;
+  created_at: Date;
+}
+
+export interface IComment {
+  id: string;
+  draft_id: string;
+  user_id: string;
+  content: string;
+  created_at: Date;
+  updated_at: Date;
+  profiles: IProfile;
+}

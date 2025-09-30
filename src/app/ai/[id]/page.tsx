@@ -11,6 +11,11 @@ import { useAIService } from '@/hooks/useAIService';
 
 const supabase = createClient();
 
+const toUUID = (id: number | string): string => {
+  const str = id.toString();
+  return '00000000-0000-0000-0000-' + str.padStart(12, '0');
+}
+
 const ChatPage = () => {
   const params = useParams();
   const router = useRouter();
@@ -45,8 +50,7 @@ const ChatPage = () => {
     try {
       const { data: sessionData, error: sessionError } = await supabase
         .from('chat_sesssion')
-        .select('*')
-        .eq('id', sessionId)
+                    .select('*')        .eq('id', sessionId)
         .eq('user_id', user.id)
         .single();
 
@@ -56,7 +60,7 @@ const ChatPage = () => {
       const { data: messagesData, error: messagesError } = await supabase
         .from('session_messages')
         .select('*')
-        .eq('chat_session_id', sessionId)
+        .eq('chat_session_id', toUUID(sessionId))
         .order('created_at', { ascending: true });
 
       if (messagesError) throw messagesError;
@@ -71,13 +75,13 @@ const ChatPage = () => {
   const subscribeToMessages = () => {
     const subscription = supabase
       .channel('messages')
-      .on('postgres_changes', 
+      .on('postgres_changes',
         {
-          event: 'INSERT', 
-          schema: 'public', 
+          event: 'INSERT',
+          schema: 'public',
           table: 'session_messages',
-          filter: `chat_session_id=eq.${sessionId}`
-        }, 
+          filter: `chat_session_id=eq.${toUUID(sessionId)}`
+        },
         (payload) => {
           setMessages(prev => [...prev, payload.new as ISessionMessage]);
         }
@@ -105,12 +109,12 @@ const ChatPage = () => {
 const { data: userMessage, error: userError } = await supabase
   .from('session_messages')
   .insert({
-    id: crypto.randomUUID(), // <-- Add this line
-    session_id: null,
+    id: crypto.randomUUID(),
+    session_id: toUUID(sessionId),
     user_id: user.id,
     content: userMessageContent,
     sender: 'user',
-    chat_session_id: sessionId
+    chat_session_id: toUUID(sessionId)
   })
   .select()
   .single();
@@ -124,11 +128,11 @@ const { data: userMessage, error: userError } = await supabase
 const { data: aiMessage, error: aiError } = await supabase
   .from('session_messages')
   .insert({
-    id: crypto.randomUUID(), // <-- Add this line
-    session_id: null,
+    id: crypto.randomUUID(),
+    session_id: toUUID(sessionId),
     content: aiResponse,
     sender: 'ai',
-    chat_session_id: sessionId
+    chat_session_id: toUUID(sessionId)
   })
   .select()
   .single();

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState,useEffect } from 'react';
 import { FiBold, FiItalic, FiUnderline, FiList, FiAlignLeft, FiAlignCenter, FiAlignRight, FiLink2, FiOctagon, FiFileText, FiGlobe, FiRotateCw, FiTarget, FiCoffee, FiAward, FiMinus, FiMessageSquare, FiCode } from 'react-icons/fi';
 import type { IProfile } from '@/types/main.db';
 
@@ -13,7 +13,10 @@ const AdvancedEditor: React.FC<{
   onlineUsers?: any[];
   currentUser?: IProfile | null;
   onAIAction?: (action: string, content: string) => Promise<string>;
-}> = ({ value, onChange, placeholder = "Start writing your research findings...", disabled = false, onlineUsers = [], currentUser, onAIAction }) => {
+  onAddComment?: (comment: string) => void;
+  onCursorPositionChange?: (position: any) => void;
+  cursorPositions?: Record<string, any>;
+}> = ({ value, onChange, placeholder = "Start writing your research findings...", disabled = false, onlineUsers = [], currentUser, onAIAction, onAddComment, onCursorPositionChange, cursorPositions = {} }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isAILoading, setIsAILoading] = useState(false);
   const [showAITools, setShowAITools] = useState(false);
@@ -23,6 +26,27 @@ const AdvancedEditor: React.FC<{
       editorRef.current.innerHTML = value;
     }
   }, [value]);
+
+  const handleSelectionChange = () => {
+    if (onCursorPositionChange) {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        onCursorPositionChange({
+          top: rect.top,
+          left: rect.left,
+        });
+      }
+    }
+  };
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+    };
+  }, [onCursorPositionChange]);
 
   
   const formatText = (command: string, value?: string) => {
@@ -53,6 +77,31 @@ const AdvancedEditor: React.FC<{
       }
       
       onChange(editorRef.current.innerHTML);
+    } catch (error) {
+      console.error('AI Action failed:', error);
+    } finally {
+      setIsAILoading(false);
+    }
+  };
+
+  const handleAddComment = () => {
+    const comment = prompt('Enter your comment:');
+    if (comment && onAddComment) {
+      onAddComment(comment);
+    }
+  };
+
+  const handleSummarize = async () => {
+    if (!onAIAction || !editorRef.current) return;
+    
+    const content = editorRef.current.innerText;
+    
+    if (!content.trim()) return;
+    
+    setIsAILoading(true);
+    try {
+      const result = await onAIAction('summarize', content);
+      alert(`Summary:\n\n${result}`);
     } catch (error) {
       console.error('AI Action failed:', error);
     } finally {
@@ -114,6 +163,13 @@ const AdvancedEditor: React.FC<{
 
   return (
     <div className="border border-gray-300 rounded-lg overflow-hidden relative">
+      {Object.entries(cursorPositions).map(([userId, position]) => (
+        <div
+          key={userId}
+          className="absolute w-0.5 h-5 bg-red-500"
+          style={{ top: position.top, left: position.left }}
+        />
+      ))}
       {showSlashCommand && (
         <div className="absolute top-16 left-4 z-20 bg-white border border-gray-200 rounded-lg shadow-xl w-64 animate-fade-in-down-fast">
           <div className="p-2 max-h-64 overflow-y-auto">
@@ -192,6 +248,15 @@ const AdvancedEditor: React.FC<{
         >
           <FiOctagon className="w-4 h-4 text-purple-600" />
           {showAITools && <div className="absolute top-0 right-0 w-2 h-2 bg-purple-500 rounded-full"></div>}
+        </button>
+
+        <button 
+          type="button" 
+          onClick={handleSummarize}
+          className="p-2 rounded hover:bg-gray-200 transition-colors"
+          title="Summarize"
+        >
+          <FiFileText className="w-4 h-4 text-blue-600" />
         </button>
         
         <div className="w-px h-6 bg-gray-300 mx-1"></div>
@@ -288,6 +353,15 @@ const AdvancedEditor: React.FC<{
           title="Insert Link"
         >
           <FiLink2 className="w-4 h-4" />
+        </button>
+
+        <button 
+          type="button" 
+          onClick={handleAddComment}
+          className="p-2 rounded hover:bg-gray-200 transition-colors"
+          title="Add Comment"
+        >
+          <FiMessageSquare className="w-4 h-4" />
         </button>
         
         <div className="w-px h-6 bg-gray-300 mx-1"></div>
