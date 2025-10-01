@@ -1,6 +1,6 @@
 'use client';
 
-import type { AnalyticsData, ITeamMember } from '@/types/main.db';
+import type { AnalyticsData, ITeamMember, ITeamMessage } from '@/types/main.db';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface TeamAnalyticsProps {

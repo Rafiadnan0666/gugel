@@ -3,44 +3,13 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { IProfile } from '@/types/main.db';
-
-const ToggleSwitch = ({ label, enabled, onChange }) => (
-  <div className="flex items-center justify-between py-4 border-b">
-    <span className="text-lg font-medium text-gray-800">{label}</span>
-    <button
-      onClick={() => onChange(!enabled)}
-      className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-300 focus:outline-none ${
-        enabled ? 'bg-blue-600' : 'bg-gray-300'
-      }`}
-    >
-      <span
-        className={`inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-300 ${
-          enabled ? 'translate-x-6' : 'translate-x-1'
-        }`}
-      />
-    </button>
-  </div>
-);
-
-const Dropdown = ({ label, value, options, onChange }) => (
-  <div className="flex items-center justify-between py-4 border-b">
-    <span className="text-lg font-medium text-gray-800">{label}</span>
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-    >
-      {options.map(option => (
-        <option key={option.value} value={option.value}>{option.label}</option>
-      ))}
-    </select>
-  </div>
-);
+import type { IProfile, ISettings } from '@/types/main.db';
+import ToggleSwitch from '@/components/settings/ToggleSwitch';
+import Dropdown from '@/components/settings/Dropdown';
 
 export default function SettingsPage() {
   const [profile, setProfile] = useState<IProfile | null>(null);
-  const [settings, setSettings] = useState<Record<string, any>>({});
+  const [settings, setSettings] = useState<Partial<ISettings>>({});
   const [loading, setLoading] = useState(true);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -76,7 +45,7 @@ export default function SettingsPage() {
     fetchProfile();
   }, [router, supabase]);
 
-  const handleSettingChange = (key: string, value: any) => {
+  const handleSettingChange = (key: keyof ISettings, value: ISettings[keyof ISettings]) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
@@ -95,9 +64,9 @@ export default function SettingsPage() {
       if (error) throw error;
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error updating settings:', err);
-      setSaveError(err.message || 'Failed to update settings');
+      setSaveError((err as Error).message || 'Failed to update settings');
     }
   };
 
