@@ -31,6 +31,7 @@ import {
   FiFileText, FiCopy, FiRotateCw, FiShuffle, FiVolume2,FiMaximize
 } from 'react-icons/fi';
 import AIResponse from '@/components/AIResponse';
+import { exportToPDF } from '@/lib/pdf';
 
 // Advanced AI Service with Language Model Integration
 const useAIService = () => {
@@ -1008,6 +1009,8 @@ export default function AdvancedSessionPage() {
   const [showFullEditor, setShowFullEditor] = useState(false);
   const [aiGeneratedDrafts, setAiGeneratedDrafts] = useState<string[]>([]);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
+  const [showPDFModal, setShowPDFModal] = useState(false);
+  const [pdfTemplate, setPdfTemplate] = useState('simple');
 
   // Enhanced Hooks
   const { 
@@ -1293,23 +1296,25 @@ finally {
     }
   };
 
-  const exportToPDF = () => {
-    const draftElement = document.querySelector('.prose'); // Assuming the draft content is in an element with class 'prose'
-    if (draftElement) {
-      import('html2canvas').then(html2canvas => {
-        import('jspdf').then(jsPDF => {
-          html2canvas.default(draftElement as HTMLElement).then(canvas => {
-            const imgData = canvas.toDataURL('image/png');
-            const pdf = new jsPDF.default();
-            const imgProps= pdf.getImageProperties(imgData);
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-            pdf.save(`${session?.title || 'research'}-draft.pdf`);
-          });
-        });
-      });
+  const handleExport = async (template: string) => {
+    if (!session) return;
+
+    setShowPDFModal(false);
+
+    let tabsToExport: any[] = [];
+    if (template === 'academic' || template === 'research') {
+      tabsToExport = tabs;
     }
+
+    const draftToExport = {
+      content: currentDraft,
+      version: draftVersion,
+      research_sessions: {
+        title: session?.title || 'Research'
+      }
+    };
+
+    exportToPDF(template, draftToExport as any, tabsToExport);
   };
 
   const generateAIDraft = async () => {
@@ -1990,7 +1995,7 @@ finally {
                   </button>
 
                   <button 
-                    onClick={exportToPDF}
+                    onClick={() => setShowPDFModal(true)}
                     className="w-full text-left p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
                     <div className="flex items-center space-x-3">
                       <FiDownload className="w-5 h-5 text-purple-600" />
@@ -2065,6 +2070,50 @@ finally {
           <p className="text-gray-700">{modal.data?.message}</p>
         </div>
       </Modal>
+
+      {showPDFModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-semibold">Choose PDF Template</h3>
+              <button onClick={() => setShowPDFModal(false)} className="p-1 rounded-full hover:bg-gray-200">
+                <FiX />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div
+                onClick={() => setPdfTemplate('simple')}
+                className={`p-4 border rounded-lg cursor-pointer ${pdfTemplate === 'simple' ? 'border-blue-500' : 'border-gray-300'}`}
+              >
+                <h4 className="font-semibold">Simple</h4>
+                <p className="text-sm text-gray-600">A clean and simple layout.</p>
+              </div>
+              <div
+                onClick={() => setPdfTemplate('academic')}
+                className={`p-4 border rounded-lg cursor-pointer ${pdfTemplate === 'academic' ? 'border-blue-500' : 'border-gray-300'}`}
+              >
+                <h4 className="font-semibold">Academic</h4>
+                <p className="text-sm text-gray-600">A template for academic papers.</p>
+              </div>
+              <div
+                onClick={() => setPdfTemplate('research')}
+                className={`p-4 border rounded-lg cursor-pointer ${pdfTemplate === 'research' ? 'border-blue-500' : 'border-gray-300'}`}
+              >
+                <h4 className="font-semibold">Research Paper</h4>
+                <p className="text-sm text-gray-600">A template for research papers with sources.</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => handleExport(pdfTemplate)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Export
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }

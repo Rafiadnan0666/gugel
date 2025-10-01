@@ -29,7 +29,7 @@ const AiPage = () => {
     try {
    
       const { data: chatSessionsData, error: chatError } = await supabase
-        .from('chat_sesssion')
+        .from('chat_session')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
@@ -48,12 +48,8 @@ const AiPage = () => {
       setChatSessions(chatSessionsData || []);
       setResearchSessions(researchSessionsData || []);
     } catch (error) {
-      if (error instanceof Error) {
-        console.error('Error fetching session data:', error.message, error.stack);
-      } else {
-        console.error('Error fetching session data:', JSON.stringify(error));
+      console.error('Error fetching session data:', error);
   }
-}
 
      finally {
     }
@@ -64,7 +60,7 @@ const AiPage = () => {
     try {
     
 const { data: newSession, error } = await supabase
-  .from('chat_sesssion')
+  .from('chat_session')
   .insert({
     title: 'New Chat',
     user_id: user.id,
@@ -75,13 +71,17 @@ const { data: newSession, error } = await supabase
 
       if (error) throw error;
       if (newSession) {
+        await supabase.from('ai_traces').insert({ 
+          user_id: user.id, 
+          session_id: newSession.id, 
+          type: 'info',
+          prompt: 'New chat started',
+          response: ''
+        });
         router.push(`/ai/${newSession.id}`);
       }
     } catch (error) {
-      console.error('Error creating new chat session:', JSON.stringify(error, null, 2));
-      if (error && Object.keys(error).length === 0) {
-        console.error("An empty error object was caught. This might be due to a Row Level Security (RLS) policy violation in Supabase. Please check your insert policies for the 'chat_sessions' table.");
-      }
+      console.error('Error creating new chat session:', error);
     }
   };
 
@@ -99,26 +99,38 @@ const { data: newSession, error } = await supabase
 
       if (error) throw error;
       if (newSession) {
+        await supabase.from('ai_traces').insert({ 
+          user_id: user.id, 
+          session_id: newSession.id, 
+          type: 'info',
+          prompt: 'New research started',
+          response: ''
+        });
         router.push(`/ai/research/${newSession.id}`);
       }
     } catch (error) {
-      console.error('Error creating new research session:', JSON.stringify(error, null, 2));
-      if (error && Object.keys(error).length === 0) {
-        console.error("An empty error object was caught. This might be due to a Row Level Security (RLS) policy violation in Supabase. Please check your insert policies for the 'research_sessions' table.");
-      }
+      console.error('Error creating new research session:', error);
     }
   };
 
   const deleteSession = async (sessionId: string, type: 'chat' | 'research') => {
     if (!user) return;
     try {
-      const table = type === 'chat' ? 'chat_sesssion' : 'research_sessions';
+      const table = type === 'chat' ? 'chat_session' : 'research_sessions';
       const { error } = await supabase
         .from(table)
         .delete()
         .eq('id', sessionId);
 
       if (error) throw error;
+
+      await supabase.from('ai_traces').insert({ 
+        user_id: user.id, 
+        session_id: sessionId, 
+        type: 'info',
+        prompt: `Deleted ${type} session: ${sessionId}`,
+        response: ''
+      });
       
       if (type === 'chat') {
         setChatSessions(chatSessions.filter(session => String(session.id) !== sessionId));
@@ -127,11 +139,7 @@ const { data: newSession, error } = await supabase
       }
 
 } catch (error) {
-  if (error instanceof Error) {
-    console.error('Error deleting session:', error.message, error.stack);
-  } else {
-    console.error('Error deleting session:', JSON.stringify(error));
-  }
+  console.error('Error deleting session:', error);
 }
 
   };
@@ -163,7 +171,7 @@ const { data: newSession, error } = await supabase
       const { data: draft, error } = await supabase
         .from('drafts')
         .insert({
-          research_session_id: null,
+          research_session_id: type === 'research' ? sessionId : null,
           content: contentToExport,
           version: 1,
           user_id: user.id

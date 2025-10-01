@@ -5,10 +5,20 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import type { IDraft } from '@/types/main.db';
+import { exportToPDF } from '@/lib/pdf';
 
 interface IDraftWithResearchSession extends IDraft {
   research_sessions: {
     title: string;
+  };
+}
+
+interface IComment {
+  id: string;
+  content: string;
+  profiles: {
+    avatar_url: string;
+    full_name: string;
   };
 }
 
@@ -174,119 +184,28 @@ export default function DraftEditPage() {
     }
   };
 
-  const exportToPDF = async (template: string) => {
+  const handleExport = async (template: string) => {
     if (!draft) return;
 
     setShowPDFModal(false);
 
-    if (template === 'simple') {
-      import('jspdf').then(jsPDF => {
-        const doc = new jsPDF.default();
-        const pageHeight = doc.internal.pageSize.height;
-        let y = 20; // Initial y position
-
-        // Title
-        doc.setFontSize(22);
-        doc.text(draft.research_sessions?.title || 'Draft', 10, y);
-        y += 10;
-
-        // Version
-        doc.setFontSize(12);
-        doc.setTextColor(100);
-        doc.text(`Version ${draft.version}`, 10, y);
-        y += 10;
-
-        // Horizontal line
-        doc.setDrawColor(200);
-        doc.line(10, y, 200, y);
-        y += 10;
-
-        // Content
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        
-        // Create a temporary div to get the text content from the HTML
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = editedContent;
-        const textContent = tempDiv.innerText;
-
-        const splitText = doc.splitTextToSize(textContent, 180);
-        
-        splitText.forEach(line => {
-          if (y > pageHeight - 20) {
-            doc.addPage();
-            y = 20;
-          }
-          doc.text(line, 10, y);
-          y += 7;
-        });
-
-        doc.save(`${draft.research_sessions?.title || 'draft'}.pdf`);
-      });
-    } else if (template === 'academic' || template === 'research') {
-      // Fetch tabs for the research session
-      const { data: tabs, error } = await supabase
+    let tabs: any[] = [];
+    if (template === 'academic' || template === 'research') {
+      const { data, error } = await supabase
         .from('tabs')
         .select('*')
         .eq('session_id', draft.research_session_id);
 
       if (error) {
         console.error('Error fetching tabs:', error);
-        return;
+      } else {
+        tabs = data;
       }
-
-      import('jspdf').then(jsPDF => {
-        const doc = new jsPDF.default();
-        
-        // Title page
-        doc.setFontSize(22);
-        doc.text(draft.research_sessions?.title || 'Draft', 10, 140);
-        doc.setFontSize(12);
-        doc.setTextColor(100);
-        doc.text(`Version ${draft.version}`, 10, 150);
-
-        doc.addPage();
-
-        // Content
-        doc.setFontSize(12);
-        doc.setTextColor(0);
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = editedContent;
-        const textContent = tempDiv.innerText;
-        const splitText = doc.splitTextToSize(textContent, 180);
-        let y = 20;
-        const pageHeight = doc.internal.pageSize.height;
-        splitText.forEach(line => {
-          if (y > pageHeight - 20) {
-            doc.addPage();
-            y = 20;
-          }
-          doc.text(line, 10, y);
-          y += 7;
-        });
-
-        // References
-        doc.addPage();
-        doc.setFontSize(18);
-        doc.text('References', 10, 20);
-        y = 30;
-        doc.setFontSize(12);
-        tabs.forEach(tab => {
-          if (y > pageHeight - 20) {
-            doc.addPage();
-            y = 20;
-          }
-          doc.text(tab.title || '', 10, y);
-          y += 5;
-          doc.setTextColor(0, 0, 255);
-          doc.textWithLink(tab.url, 10, y, { url: tab.url });
-          doc.setTextColor(0);
-          y += 10;
-        });
-
-        doc.save(`${draft.research_sessions?.title || 'draft'}.pdf`);
-      });
     }
+
+    const draftWithContent = { ...draft, content: editedContent };
+
+    exportToPDF(template, draftWithContent, tabs);
   };
 
   if (loading) {
@@ -400,7 +319,7 @@ export default function DraftEditPage() {
             </div>
             <div className="mt-6 flex justify-end">
               <button
-                onClick={() => exportToPDF(pdfTemplate)}
+                onClick={() => handleExport(pdfTemplate)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 Export

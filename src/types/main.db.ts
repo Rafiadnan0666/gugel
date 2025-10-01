@@ -139,3 +139,35 @@ export interface IComment {
   updated_at: Date;
   profiles: IProfile;
 }
+
+export interface AnalyticsData {
+  weeklyActivity: { day: string; sessions: number; messages: number }[];
+  sessionsCreated: number;
+  messagesSent: number;
+  activeMembers: number;
+  engagementRate: number;
+}
+
+export interface PresenceUser {
+  user_id: string;
+  profile: IProfile;
+  last_seen: Date;
+  status: 'online' | 'offline';
+}
+
+export interface RealTimeEvent {
+  type: string;
+  data: any;
+  timestamp: Date;
+  user: IProfile;
+}
+
+export interface ISettings {
+  enable_ai_suggestions: boolean;
+  enable_dark_mode: boolean;
+  enable_notifications: boolean;
+  auto_save_drafts: boolean;
+  disable_sync: boolean;
+  ai_model: 'gpt-3.5' | 'gpt-4';
+  default_pdf_template: 'simple' | 'academic' | 'research';
+}
