@@ -93,7 +93,7 @@ export default function Dashboard() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const supabase = createClient();
-  const { aiStatus, promptAI } = useAIService();
+  const { aiStatus, chatWithAI } = useAIService();
   const { isOnline, lastUpdate, saveData, loadData } = useOfflineCache();
 
   // Load dashboard data
@@ -258,7 +258,7 @@ export default function Dashboard() {
   // Generate AI suggestions
   const generateAISuggestions = async (sessionsData: IResearchSession[], tabsData: ITab[], draftsData: IDraft[]) => {
     const prompt = `As a research assistant, provide 3 concise, actionable suggestions based on: ${sessionsData.length} research sessions, ${tabsData.length} collected tabs, and ${draftsData.length} drafts. Focus on productivity and research improvement.`;
-    const result = await promptAI(prompt);
+    const result = await chatWithAI(prompt, { sessions: sessionsData, tabs: tabsData, drafts: draftsData });
     const suggestions = result.split('\n')
       .filter(line => line.trim().length > 0)
       .map(line => line.replace(/^\d+\.\s*|\*\*|[-•]\s*/g, '').trim())
@@ -379,7 +379,7 @@ export default function Dashboard() {
     setChatMessages(prev => [...prev, userMessage]);
     setChatInput('');
 
-    const aiResponse = await promptAI(chatInput, { sessions, tabs, drafts });
+    const aiResponse = await chatWithAI(chatInput, { sessions, tabs, drafts });
     const aiMessage: ChatMessage = { 
       id: (Date.now() + 1).toString(), 
       content: aiResponse, 

@@ -1,79 +1,35 @@
-import { createClient } from '@/utils/supabase/client';
 import { useEffect, useState } from 'react';
 import type { ITab, IDraft } from '@/types/main.db';
 
-// Advanced AI Service with Language Model Integration
 export const useAIService = () => {
   const [aiSession, setAiSession] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
-  const supabase = createClient();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data) {
-        setUser(data.user);
-      }
-    }
-    getUser();
-  }, [supabase]);
-
-  const traceAIAction = async (type: string, prompt: string, response: string) => {
-    if (!user) return;
-
-    try {
-      await supabase.from('ai_traces').insert({
-        user_id: user.id,
-        type,
-        prompt,
-        response,
-      });
-    } catch (error) {
-      console.error('Error tracing AI action:', error);
-    }
-  };
 
   useEffect(() => {
     const initializeAI = async () => {
-      try {
-        if (!(window as any).LanguageModel) {
-          console.error("LanguageModel API not found.");
-          setAiStatus('unavailable');
-          return;
-        }
+      if (!(window as any).LanguageModel) {
+        console.error("LanguageModel API not found. Please use a compatible browser and enable the required flags.");
+        setAiStatus('unavailable');
+        return;
+      }
 
+      try {
         const opts = {
           expectedOutputs: [{ type: "text", languages: ["en"] }]
         };
 
         const availability = await (window as any).LanguageModel.availability(opts);
-        console.log("availability:", availability);
-
         if (availability === "unavailable") {
-          console.error("❌ Model masih unavailable.");
+          console.error("The on-device model is not available. Please check your browser settings.");
           setAiStatus('unavailable');
           return;
         }
 
-        const session = await (window as any).LanguageModel.create({
-          ...opts,
-          monitor(m: any) {
-            m.addEventListener("downloadprogress", (e: any) => {
-              console.log(`📥 Download progress: ${(e.loaded * 100).toFixed(1)}%`);
-            });
-            m.addEventListener("statechange", (e: any) => {
-              console.log("⚡ State change:", e.target.state);
-            });
-          }
-        });
-
-        console.log("✅ Session ready:", session);
+        const session = await (window as any).LanguageModel.create(opts);
         setAiSession(session);
         setAiStatus('ready');
-
       } catch (err) {
-        console.error("Error:", err);
+        console.error("Error initializing AI session:", err);
         setAiStatus('error');
       }
     };
@@ -81,14 +37,14 @@ export const useAIService = () => {
     initializeAI();
   }, []);
 
-  const promptAI = async (prompt: string, type: string = 'summarize') => {
+  const promptAI = async (prompt: string) => {
     if (aiStatus !== 'ready' || !aiSession) {
-      console.error("AI session not ready");
-      return "AI not available";
+      console.log("AI session not ready");
+      return "AI not available. Please use a compatible browser and enable the required flags.";
     }
+
     try {
       const result = await aiSession.prompt(prompt);
-      await traceAIAction(type, prompt, result);
       return result;
     } catch (error) {
       console.error("Error prompting AI:", error);
@@ -97,48 +53,55 @@ export const useAIService = () => {
   };
 
   const generateSummary = async (content: string, type: 'tab' | 'draft') => {
-    const prompt = `You are a world-class researcher. Please provide a concise summary of the following ${type} content. The summary should be easy to understand for a general audience and should highlight the key findings and conclusions.\n\nContent:\n\"\"\"\n${content.substring(0, 4000)}\n\"\"\"`;
-    return await promptAI(prompt, 'summarize');
+    const prompt = `Provide a concise summary of the following ${type} content:
+
+"""${content.substring(0, 4000)}"""`;
+    return await promptAI(prompt);
   };
 
-  const translateContent = async (content: string, targetLanguage: string) => {
-    const prompt = `You are a professional translator. Please translate the following content to ${targetLanguage}. The translation should be accurate and natural-sounding.\n\nContent:\n\"\"\"\n${content.substring(0, 4000)}\n\"\"\"`;
-    return await promptAI(prompt, 'translate');
+  const rewriteContent = async (content: string, style: string) => {
+    const prompt = `Rewrite the following content in a ${style} style:
+
+"""${content.substring(0, 4000)}"""`;
+    return await promptAI(prompt);
   };
 
-  const rewriteContent = async (content: string, style: string = 'academic') => {
-    const prompt = `You are a professional writer. Please rewrite the following content in a ${style} style. The rewritten content should be clear, concise, and engaging.\n\nContent:\n\"\"\"\n${content.substring(0, 4000)}\n\"\"\"`;
-    return await promptAI(prompt, 'rewrite');
+  const translateContent = async (content: string, language: string) => {
+    const prompt = `Translate the following content to ${language}:
+
+"""${content.substring(0, 4000)}"""`;
+    return await promptAI(prompt);
   };
 
-  const expandContent = async (content: string, context: string) => {
-    const prompt = `You are a professional writer. Please expand the following content with more details and examples. The expanded content should be well-structured and easy to read. The context for expansion is: ${context}\n\nContent:\n\"\"\"\n${content.substring(0, 4000)}\n\"\"\"`;
-    return await promptAI(prompt, 'expand');
+  const expandContent = async (content: string) => {
+    const prompt = `Expand the following content:
+
+"""${content.substring(0, 4000)}"""`;
+    return await promptAI(prompt);
   };
 
-  const autoGenerateDraft = async (tabs: ITab[], theme: string) => {
-    const tabContents = tabs.map(tab => 
-      `Source: ${tab.title}\nURL: ${tab.url}\nContent: ${tab.content?.substring(0, 1000)}`
-    ).join('\n\n---\n\n');
-    
-    const prompt = `You are a world-class researcher. Please generate a research draft on the theme of "${theme}". The draft should be well-structured, with a clear introduction, body, and conclusion. It should synthesize the information from the provided sources and include citations. Please use the following sources to generate the draft:\n\nSources:\n\"\"\"\n${tabContents}\n\"\"\"`;
-    return await promptAI(prompt, 'draft');
+  const summarizeUrl = async (url: string) => {
+    const prompt = `Summarize the content of the following URL:
+
+${url}`;
+    return await promptAI(prompt);
   };
 
   const chatWithAI = async (message: string, context: { tabs: ITab[], drafts: IDraft[] }) => {
-    const contextSummary = `You are a helpful AI assistant for a researcher. The researcher is working on a project with the following context:\n- ${context.tabs.length} research tabs collected\n- ${context.drafts.length} drafts written\n\nPlease provide a helpful and informative response to the researcher's question.`;
-    const prompt = `${contextSummary}\n\nResearcher's Question: ${message}`;
-    return await promptAI(prompt, 'chat');
+    const contextSummary = `The user has ${context.tabs.length} research tabs and ${context.drafts.length} drafts.`;
+    const prompt = `${contextSummary}
+
+User's question: ${message}`;
+    return await promptAI(prompt);
   };
 
   return {
     aiStatus,
     generateSummary,
-    translateContent,
     rewriteContent,
+    translateContent,
     expandContent,
-    autoGenerateDraft,
+    summarizeUrl,
     chatWithAI,
-    promptAI,
   };
 };

@@ -22,7 +22,7 @@ export default function DraftListPage() {
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<{ isOpen: boolean; type: 'session' | 'draft'; item?: any }>({ isOpen: false, type: 'session' });
   const [content, setContent] = useState('');
-  const { aiStatus, rewriteContent, generateSummary } = useAIService();
+  const { aiStatus, generateSummary, rewriteContent } = useAIService();
 
   useEffect(() => {
     loadSessions();

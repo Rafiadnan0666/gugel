@@ -24,7 +24,7 @@ export default function ResearchPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const { aiStatus, chatWithAI, rewriteContent, generateSummary } = useAIService();
+  const { aiStatus, chatWithAI, generateSummary, rewriteContent } = useAIService();
 
   useEffect(() => {
     if (sessionId) {
