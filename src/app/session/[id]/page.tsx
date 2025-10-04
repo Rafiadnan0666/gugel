@@ -1210,60 +1210,43 @@ export default function AdvancedSessionPage() {
   };
 
   const sendChatMessage = async (content: string) => {
-const userMessage: ISessionMessage = {
-  id: crypto.randomUUID(),
-  session_id: sessionId,
-  user_id: userProfile?.id,
-  content,
-  sender: 'user',
-  created_at: new Date()
-};
+    if (!userProfile) return;
+
+    const tempId = crypto.randomUUID();
+    const userMessage: ISessionMessage = {
+      id: tempId,
+      session_id: sessionId,
+      user_id: userProfile.id,
+      content,
+      sender: 'user',
+      created_at: new Date(),
+    };
+
     setChatMessages(prev => [...prev, userMessage]);
     setIsChatLoading(true);
 
     try {
-      // Save user message
       const { data: userMsg, error: userErr } = await supabase.from('session_messages').insert(userMessage).select().single();
       if (userErr) throw userErr;
 
-      const aiResponse = await chatWithAI(content, { tabs, drafts });
-const aiMessage: ISessionMessage = {
-  id: crypto.randomUUID(),
-  session_id: sessionId,
-  content: aiResponse,
-  sender: 'ai',
-  created_at: new Date()
-};
+      setChatMessages(prev => prev.map(m => m.id === tempId ? userMsg : m));
 
-      // Save AI message
+      const aiResponse = await chatWithAI(content, { tabs, drafts });
+
+      const aiMessage: Omit<ISessionMessage, 'id' | 'created_at'> = {
+        session_id: sessionId,
+        content: aiResponse,
+        sender: 'ai',
+      };
+
       const { data: aiMsg, error: aiErr } = await supabase.from('session_messages').insert(aiMessage).select().single();
       if (aiErr) throw aiErr;
 
-      // Create notification
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: userProfile?.id,
-          type: 'session_chat_message',
-          message: `You have a new message in the session "${session?.title}" `,
-          read: false,
-          updated_at: new Date().toISOString(),
-        });
+      setChatMessages(prev => [...prev, aiMsg]);
 
-      if (notificationError) {
-        throw notificationError;
-      }
-
-      setChatMessages(prev => [...prev, userMsg, aiMsg]);
-} catch (error) {
-  if (error instanceof Error) {
-    console.error('Error getting AI response:', error.message, error.stack);
-  } else {
-    console.error('Error getting AI response:', JSON.stringify(error));
-  }
-}
-
-finally {
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+    } finally {
       setIsChatLoading(false);
     }
   };

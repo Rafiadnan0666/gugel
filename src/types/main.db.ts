@@ -137,7 +137,7 @@ export interface IComment {
   content: string;
   created_at: Date;
   updated_at: Date;
-  profiles: IProfile;
+  profiles: IProfile | null;
 }
 
 export interface AnalyticsData {

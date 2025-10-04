@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { google_web_search } from '@google/generative-ai'; // This is a placeholder for the actual tool call
+// import { google_web_search } from '@google/generative-ai'; // This is a placeholder for the actual tool call
 
 async function fetchPageContent(url: string): Promise<string> {
     // In a real scenario, this would use a library like Cheerio to scrape the page content.
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'tab_id and url are required' }, { status: 400 });
   }
 
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

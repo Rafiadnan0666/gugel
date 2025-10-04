@@ -6,7 +6,9 @@ import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import type { IResearchSession, IDraft, ISessionMessage } from '@/types/main.db';
 import { useAIService } from '@/hooks/useAIService';
-import AdvancedEditor from '@/components/editor/AdvancedEditor';
+import dynamic from 'next/dynamic';
+
+const ProEditor = dynamic(() => import('@/components/editor/ProEditor').then(mod => mod.ProEditor), { ssr: false });
 import AIChat from '@/components/session/AIChat';
 import { FiArrowLeft, FiSave } from 'react-icons/fi';
 
@@ -94,32 +96,37 @@ export default function ResearchPage() {
 
   const sendChatMessage = async (content: string) => {
     if (!session) return;
+
+    const tempId = crypto.randomUUID();
     const userMessage: ISessionMessage = {
-      id: Date.now().toString(),
+      id: tempId,
       session_id: sessionId,
-      user_id: session.user_id, // Assuming session has user_id
+      user_id: session.user_id,
       content,
       sender: 'user',
-      created_at: new Date()
+      created_at: new Date(),
     };
 
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      await supabase.from('session_messages').insert(userMessage);
+      const { data: userMsg, error: userErr } = await supabase.from('session_messages').insert(userMessage).select().single();
+      if (userErr) throw userErr;
+
+      setMessages(prev => prev.map(m => m.id === tempId ? userMsg : m));
 
       const aiResponse = await chatWithAI(content, { tabs: [], drafts: draft ? [draft] : [] });
-      
-      const aiMessage: ISessionMessage = {
-        id: (Date.now() + 1).toString(),
+
+      const aiMessage: Omit<ISessionMessage, 'id' | 'created_at'> = {
         session_id: sessionId,
         content: aiResponse,
         sender: 'ai',
-        created_at: new Date()
       };
 
-      await supabase.from('session_messages').insert(aiMessage);
-      setMessages(prev => [...prev, aiMessage]);
+      const { data: aiMsg, error: aiErr } = await supabase.from('session_messages').insert(aiMessage).select().single();
+      if (aiErr) throw aiErr;
+
+      setMessages(prev => [...prev, aiMsg]);
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -169,10 +176,9 @@ export default function ResearchPage() {
             </button>
           </div>
           <div className="flex-1">
-            <AdvancedEditor 
-              value={draftContent} 
+            <ProEditor 
+              content={draftContent} 
               onChange={setDraftContent} 
-              onAIAction={handleAIAction} 
             />
           </div>
         </div>
