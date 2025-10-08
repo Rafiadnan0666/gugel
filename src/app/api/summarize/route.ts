@@ -1,22 +1,31 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-// import { google_web_search } from '@google/generative-ai'; // This is a placeholder for the actual tool call
+import * as cheerio from 'cheerio';
 
-async function fetchPageContent(url: string): Promise<string> {
-    // In a real scenario, this would use a library like Cheerio to scrape the page content.
-    // For this example, we'll simulate fetching content.
-    // In the Gemini CLI environment, I would use the web_fetch tool.
-    // Since I cannot call it from here, I will simulate a fetch.
-    console.log(`Fetching content for URL: ${url}`);
-    return `This is simulated content for ${url}. A real implementation would fetch and parse the actual page content.`;
+async function fetchPageContent(url: string): Promise<{ title: string, body: string }> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch page: ${response.statusText}`);
+    }
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const title = $('title').text();
+    const body = $('body').text().replace(/\s\s+/g, ' ').trim();
+    return { title, body };
+  } catch (error) {
+    console.error('Error fetching page content:', error);
+    // Return a generic error message or handle as needed
+    return { title: 'Error', body: 'Could not fetch content from the URL.' };
+  }
 }
 
 export async function POST(request: Request) {
-  const { tab_id, url } = await request.json();
+  const { url } = await request.json();
 
-  if (!tab_id || !url) {
-    return NextResponse.json({ error: 'tab_id and url are required' }, { status: 400 });
+  if (!url) {
+    return NextResponse.json({ error: 'URL is required' }, { status: 400 });
   }
 
   const cookieStore = await cookies();
@@ -39,28 +48,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    // In a real Gemini CLI environment, I would use the web_fetch tool here.
-    // const pageContent = await web_fetch({ prompt: `Extract the main text content from ${url}` });
-    const pageContent = await fetchPageContent(url);
+    const { title, body } = await fetchPageContent(url);
+    const summary = body.slice(0, 500) + (body.length > 500 ? '...' : '');
 
-    // And here I would use a proper generative AI tool, but I'll use google_web_search as a stand-in.
-    // const summaryResponse = await google_web_search({ query: `summarize the following text: ${pageContent}` });
-    // const summary = summaryResponse.results[0].snippet;
-    const summary = `This is a simulated summary for the content of ${url}.`;
-
-    const { data, error } = await supabase
-      .from('summaries')
-      .insert([{ tab_id, summary }])
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
-
-    return NextResponse.json(data);
+    return NextResponse.json({ summary, title });
   } catch (error) {
-    console.error('Error summarizing tab:', error);
-    return NextResponse.json({ error: 'Failed to summarize tab' }, { status: 500 });
+    console.error('Error summarizing URL:', error);
+    return NextResponse.json({ error: 'Failed to summarize URL' }, { status: 500 });
   }
 }

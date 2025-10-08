@@ -1,98 +1,63 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { ITab, IDraft } from '@/types/main.db';
 
 export const useAIService = () => {
-  const [aiSession, setAiSession] = useState<any>(null);
-  const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
+  const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error'>('ready');
 
-  useEffect(() => {
-    const initializeAI = async () => {
-      if (!(window as any).LanguageModel) {
-        console.error("LanguageModel API not found. Please use a compatible browser and enable the required flags.");
-        setAiStatus('unavailable');
-        return;
-      }
-
-      try {
-        const opts = {
-          expectedOutputs: [{ type: "text", languages: ["en"] }]
-        };
-
-        const availability = await (window as any).LanguageModel.availability(opts);
-        if (availability === "unavailable") {
-          console.error("The on-device model is not available. Please check your browser settings.");
-          setAiStatus('unavailable');
-          return;
-        }
-
-        const session = await (window as any).LanguageModel.create(opts);
-        setAiSession(session);
-        setAiStatus('ready');
-      } catch (err) {
-        console.error("Error initializing AI session:", err);
-        setAiStatus('error');
-      }
-    };
-
-    initializeAI();
-  }, []);
-
-  const promptAI = async (prompt: string) => {
-    if (aiStatus !== 'ready' || !aiSession) {
-      console.log("AI session not ready");
-      return "AI not available. Please use a compatible browser and enable the required flags.";
-    }
-
+  const promptAI = async (prompt: string, task: string, context?: any) => {
+    setAiStatus('loading');
     try {
-      const result = await aiSession.prompt(prompt);
-      return result;
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt, task, context }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'AI request failed');
+      }
+
+      const data = await response.json();
+      setAiStatus('ready');
+      return data.result;
     } catch (error) {
-      console.error("Error prompting AI:", error);
-      return "Error from AI";
+      console.error(`Error in AI task '${task}':`, error);
+      setAiStatus('error');
+      return "An error occurred while processing your request.";
     }
   };
 
   const generateSummary = async (content: string, type: 'tab' | 'draft') => {
-    const prompt = `Provide a concise summary of the following ${type} content:
-
-"""${content.substring(0, 4000)}"""`;
-    return await promptAI(prompt);
+    const prompt = `Provide a concise summary of the following ${type} content:\n\n"""${content.substring(0, 8000)}"""`;
+    return await promptAI(prompt, 'summarize');
   };
 
   const rewriteContent = async (content: string, style: string) => {
-    const prompt = `Rewrite the following content in a ${style} style:
-
-"""${content.substring(0, 4000)}"""`;
-    return await promptAI(prompt);
+    const prompt = `Rewrite the following content in a ${style} style:\n\n"""${content.substring(0, 8000)}"""`;
+    return await promptAI(prompt, 'rewrite');
   };
 
   const translateContent = async (content: string, language: string) => {
-    const prompt = `Translate the following content to ${language}:
-
-"""${content.substring(0, 4000)}"""`;
-    return await promptAI(prompt);
+    const prompt = `Translate the following content to ${language}:\n\n"""${content.substring(0, 8000)}"""`;
+    return await promptAI(prompt, 'translate');
   };
 
   const expandContent = async (content: string) => {
-    const prompt = `Expand the following content:
-
-"""${content.substring(0, 4000)}"""`;
-    return await promptAI(prompt);
+    const prompt = `Expand the following content:\n\n"""${content.substring(0, 8000)}"""`;
+    return await promptAI(prompt, 'expand');
   };
 
   const summarizeUrl = async (url: string) => {
-    const prompt = `Summarize the content of the following URL:
-
-${url}`;
-    return await promptAI(prompt);
+    return await promptAI(url, 'summarize-url');
   };
 
   const chatWithAI = async (message: string, context: { tabs: ITab[], drafts: IDraft[] }) => {
     const contextSummary = `The user has ${context.tabs.length} research tabs and ${context.drafts.length} drafts.`;
-    const prompt = `${contextSummary}
-
-User's question: ${message}`;
-    return await promptAI(prompt);
+    const prompt = `${contextSummary}\n\nUser's question: ${message}`;
+    return await promptAI(prompt, 'chat', context);
   };
 
   return {
@@ -105,3 +70,4 @@ User's question: ${message}`;
     chatWithAI,
   };
 };
+
