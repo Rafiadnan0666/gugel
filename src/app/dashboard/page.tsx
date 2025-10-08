@@ -148,7 +148,7 @@ export default function Dashboard() {
       ]);
 
       const sessionsData = sessionsResponse.data || [];
-      const teamsData = teamsResponse.data?.map(t => t.teams) || [];
+      const teamsData = teamsResponse.data?.flatMap(t => t.teams).filter(Boolean) as ITeam[] || [];
       const tabsData = tabsResponse.data || [];
       const draftsData = draftsResponse.data || [];
       const recentDraftsData = recentDraftsResponse.data || [];
@@ -258,7 +258,7 @@ export default function Dashboard() {
   // Generate AI suggestions
   const generateAISuggestions = async (sessionsData: IResearchSession[], tabsData: ITab[], draftsData: IDraft[]) => {
     const prompt = `As a research assistant, provide 3 concise, actionable suggestions based on: ${sessionsData.length} research sessions, ${tabsData.length} collected tabs, and ${draftsData.length} drafts. Focus on productivity and research improvement.`;
-    const result = await chatWithAI(prompt, { sessions: sessionsData, tabs: tabsData, drafts: draftsData });
+    const result = await chatWithAI(prompt, { tabs: tabsData, drafts: draftsData });
     const suggestions = result.split('\n')
       .filter(line => line.trim().length > 0)
       .map(line => line.replace(/^\d+\.\s*|\*\*|[-•]\s*/g, '').trim())
@@ -379,7 +379,7 @@ export default function Dashboard() {
     setChatMessages(prev => [...prev, userMessage]);
     setChatInput('');
 
-    const aiResponse = await chatWithAI(chatInput, { sessions, tabs, drafts });
+    const aiResponse = await chatWithAI(chatInput, { tabs, drafts });
     const aiMessage: ChatMessage = { 
       id: (Date.now() + 1).toString(), 
       content: aiResponse, 
@@ -390,7 +390,7 @@ export default function Dashboard() {
   };
 
   // Format date helper
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     return new Date(dateString).toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric', 
@@ -399,7 +399,7 @@ export default function Dashboard() {
   };
 
   // Format relative time
-  const formatRelativeTime = (dateString: string) => {
+  const formatRelativeTime = (dateString: string | Date) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));

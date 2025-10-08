@@ -10,7 +10,9 @@ import {
   FiChevronRight
 } from 'react-icons/fi';
 import { useAIService } from '@/hooks/useAIService';
-import AdvancedEditor from '@/components/editor/AdvancedEditor';
+import dynamic from 'next/dynamic';
+
+const ProEditor = dynamic(() => import('@/components/editor/ProEditor').then(mod => mod.ProEditor), { ssr: false });
 
 // Main Page Component
 export default function DraftListPage() {
@@ -23,30 +25,57 @@ export default function DraftListPage() {
   const [modal, setModal] = useState<{ isOpen: boolean; type: 'session' | 'draft'; item?: any }>({ isOpen: false, type: 'session' });
   const [content, setContent] = useState('');
   const { aiStatus, generateSummary, rewriteContent } = useAIService();
+  const [sessionPage, setSessionPage] = useState(1);
+  const [hasMoreSessions, setHasMoreSessions] = useState(true);
+  const [draftsPage, setDraftsPage] = useState<Record<string, number>>({});
+  const [hasMoreDrafts, setHasMoreDrafts] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    loadSessions();
-  }, []);
+    loadSessions(sessionPage);
+  }, [sessionPage]);
 
-  const loadSessions = async () => {
+  const loadSessions = async (page = 1) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    const { data } = await supabase.from('research_sessions').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
-    setSessions(data || []);
+
+    const { data } = await supabase
+      .from('research_sessions')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .range((page - 1) * 10, page * 10 - 1);
+
+    if (data) {
+      setSessions(prev => (page === 1 ? data : [...prev, ...data]));
+      setHasMoreSessions(data.length === 10);
+    }
     setLoading(false);
   };
 
-  const loadDrafts = async (sessionId: string) => {
-    const { data } = await supabase.from('drafts').select('*').eq('research_session_id', sessionId).order('created_at', { ascending: false });
-    setDrafts(prev => ({ ...prev, [sessionId]: data || [] }));
+  const loadDrafts = async (sessionId: string, page = 1) => {
+    const { data } = await supabase
+      .from('drafts')
+      .select('*')
+      .eq('research_session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .range((page - 1) * 10, page * 10 - 1);
+
+    if (data) {
+      setDrafts(prev => ({ ...prev, [sessionId]: page === 1 ? data : [...(prev[sessionId] || []), ...data] }));
+      setHasMoreDrafts(prev => ({ ...prev, [sessionId]: data.length === 10 }));
+    }
   };
 
   const toggleSession = (id: string) => {
     const newExpanded = new Set(expandedSessions);
-    if (newExpanded.has(id)) newExpanded.delete(id);
-    else {
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
       newExpanded.add(id);
-      if (!drafts[id]) loadDrafts(id);
+      if (!drafts[id]) {
+        setDraftsPage(prev => ({ ...prev, [id]: 1 }));
+        loadDrafts(id, 1);
+      }
     }
     setExpandedSessions(newExpanded);
   };
@@ -144,10 +173,34 @@ export default function DraftListPage() {
                     ))}
                   </div>
                   {drafts[session.id] && drafts[session.id].length === 0 && <p className="text-center text-gray-500 py-4">No drafts in this session yet.</p>}
+                  {hasMoreDrafts[session.id] && (
+                    <div className="flex justify-center mt-4">
+                      <button
+                        onClick={() => {
+                          const nextPage = (draftsPage[session.id] || 1) + 1;
+                          setDraftsPage(prev => ({ ...prev, [session.id]: nextPage }));
+                          loadDrafts(session.id, nextPage);
+                        }}
+                        className="text-sm bg-gray-200 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-300"
+                      >
+                        Load More
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           ))}
+          {hasMoreSessions && (
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={() => setSessionPage(prev => prev + 1)}
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700"
+              >
+                Load More Sessions
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -158,7 +211,7 @@ export default function DraftListPage() {
             {modal.type === 'session' ? (
               <input value={content} onChange={e => setContent(e.target.value)} placeholder="Session title" className="w-full p-3 border rounded-lg" />
             ) : (
-              <AdvancedEditor value={content} onChange={setContent} onAIAction={handleAIAction} />
+              <ProEditor content={content} onChange={setContent} />
             )}
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={() => setModal({ isOpen: false, type: 'session' })} className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">Cancel</button>

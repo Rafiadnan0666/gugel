@@ -33,7 +33,7 @@ import {
 import AIResponse from '@/components/AIResponse';
 import { exportToPDF } from '@/lib/pdf';
 
-// Advanced AI Service with Language Model Integration
+// Enhanced AI Service with Language Model Integration
 const useAIService = () => {
   const [aiSession, setAiSession] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
@@ -41,15 +41,22 @@ const useAIService = () => {
   useEffect(() => {
     const initializeAI = async () => {
       try {
+        // Check if LanguageModel API is available
+        if (!(window as any).LanguageModel) {
+          console.warn("LanguageModel API not available, using fallback");
+          setAiStatus('unavailable');
+          return;
+        }
+
         const opts = {
           expectedOutputs: [{ type: "text", languages: ["en"] }]
         };
 
         const availability = await (window as any).LanguageModel.availability(opts);
-        console.log("availability:", availability);
+        console.log("AI availability:", availability);
 
         if (availability === "unavailable") {
-          console.error("❌ Model masih unavailable.");
+          console.warn("AI model unavailable");
           setAiStatus('unavailable');
           return;
         }
@@ -58,30 +65,24 @@ const useAIService = () => {
           ...opts,
           monitor(m: any) {
             m.addEventListener("downloadprogress", (e: any) => {
-              console.log(`📥 Download progress: ${(e.loaded * 100).toFixed(1)}%`);
+              console.log(`AI download progress: ${(e.loaded * 100).toFixed(1)}%`);
             });
             m.addEventListener("statechange", (e: any) => {
-              console.log("⚡ State change:", e.target.state);
+              console.log("AI state change:", e.target.state);
             });
           }
         });
 
-        console.log("✅ Session ready:", session);
         setAiSession(session);
         setAiStatus('ready');
 
       } catch (err) {
-        console.error("Error:", err);
+        console.error("AI initialization error:", err);
         setAiStatus('error');
       }
     };
 
-    if ((window as any).LanguageModel) {
-      initializeAI();
-    } else {
-      console.error("LanguageModel API not found");
-      setAiStatus('error');
-    }
+    initializeAI();
   }, []);
 
   const promptAI = async (prompt: string) => {
@@ -99,22 +100,22 @@ const useAIService = () => {
   };
 
   const generateSummary = async (content: string, type: 'tab' | 'draft') => {
-    const prompt = `Summarize this ${type} content: ${content.substring(0, 2000)}`;
+    const prompt = `Summarize this ${type} content in a concise and informative way: ${content.substring(0, 2000)}`;
     return await promptAI(prompt);
   };
 
   const translateContent = async (content: string, targetLanguage: string) => {
-    const prompt = `Translate to ${targetLanguage}: ${content.substring(0, 2000)}`;
+    const prompt = `Translate the following text to ${targetLanguage}. Keep the meaning accurate and natural: ${content.substring(0, 2000)}`;
     return await promptAI(prompt);
   };
 
   const rewriteContent = async (content: string, style: string = 'academic') => {
-    const prompt = `Rewrite in ${style} style: ${content.substring(0, 2000)}`;
+    const prompt = `Rewrite the following text in ${style} style while preserving the core meaning: ${content.substring(0, 2000)}`;
     return await promptAI(prompt);
   };
 
   const expandContent = async (content: string, context: string) => {
-    const prompt = `Expand this content with ${context}: ${content.substring(0, 2000)}`;
+    const prompt = `Expand this content with additional ${context}. Make it more detailed and comprehensive: ${content.substring(0, 2000)}`;
     return await promptAI(prompt);
   };
 
@@ -123,13 +124,18 @@ const useAIService = () => {
       `Source: ${tab.title}\nContent: ${tab.content?.substring(0, 500)}`
     ).join('\n\n');
     
-    const prompt = `Create a research draft about ${theme} using these sources:\n\n${tabContents}`;
+    const prompt = `Create a well-structured research draft about "${theme}" using these sources. Include introduction, key findings, and conclusion:\n\n${tabContents}`;
     return await promptAI(prompt);
   };
 
   const chatWithAI = async (message: string, context: { tabs: ITab[], drafts: IDraft[] }) => {
-    const contextSummary = `Research Context: ${context.tabs.length} tabs, ${context.drafts.length} drafts`;
-    const prompt = `${contextSummary}\n\nUser Question: ${message}`;
+    const contextSummary = `Research Context: ${context.tabs.length} research sources, ${context.drafts.length} drafts`;
+    const prompt = `${contextSummary}\n\nUser Question: ${message}\n\nPlease provide a helpful and accurate response based on the research context.`;
+    return await promptAI(prompt);
+  };
+
+  const analyzeURLContent = async (url: string) => {
+    const prompt = `Analyze the content from this URL and provide a comprehensive summary with key points: ${url}`;
     return await promptAI(prompt);
   };
 
@@ -141,8 +147,8 @@ const useAIService = () => {
     expandContent,
     autoGenerateDraft,
     chatWithAI,
-    promptAI, // expose promptAI
-    initializeAI: () => {} // No-op, initialization is now in useEffect
+    analyzeURLContent,
+    promptAI
   };
 };
 
@@ -155,7 +161,7 @@ const useCollaboration = (sessionId: string, userId: string) => {
   const supabase = createClient();
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !userId) return;
 
     const channel = supabase.channel(`session:${sessionId}`)
       .on('presence', { event: 'sync' }, () => {
@@ -253,7 +259,10 @@ const AdvancedEditor: React.FC<{
     const selection = window.getSelection();
     const selectedText = selection?.toString() || editorRef.current.innerText;
     
-    if (!selectedText.trim()) return;
+    if (!selectedText.trim()) {
+      alert('Please select some text to use AI tools');
+      return;
+    }
     
     setIsAILoading(true);
     try {
@@ -263,14 +272,25 @@ const AdvancedEditor: React.FC<{
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         range.deleteContents();
-        range.insertNode(document.createTextNode(result));
+        const textNode = document.createTextNode(result);
+        range.insertNode(textNode);
+        
+        // Move cursor after inserted text
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        selection.removeAllRanges();
+        selection.addRange(range);
       } else {
-        editorRef.current.innerHTML += `<p>${result}</p>`;
+        // If no selection, append to end
+        const p = document.createElement('p');
+        p.textContent = result;
+        editorRef.current.appendChild(p);
       }
       
       onChange(editorRef.current.innerHTML);
     } catch (error) {
       console.error('AI Action failed:', error);
+      alert('AI action failed. Please try again.');
     } finally {
       setIsAILoading(false);
     }
@@ -428,7 +448,10 @@ const AdvancedEditor: React.FC<{
         {/* Links */}
         <button 
           type="button" 
-          onClick={() => formatText('createLink', prompt('Enter URL:'))}
+          onClick={() => {
+            const url = prompt('Enter URL:');
+            if (url) formatText('createLink', url);
+          }}
           className="p-2 rounded hover:bg-gray-200 transition-colors"
           title="Insert Link"
         >
@@ -471,7 +494,7 @@ const AdvancedEditor: React.FC<{
         onInput={(e) => onChange(e.currentTarget.innerHTML)}
         onPaste={handlePaste}
         className="min-h-96 p-4 focus:outline-none prose prose-sm max-w-none bg-white"
-        dangerouslySetInnerHTML={{ __html: value || placeholder }}
+        dangerouslySetInnerHTML={{ __html: value || `<p>${placeholder}</p>` }}
         style={{ 
           fontFamily: "'Inter', sans-serif",
           lineHeight: '1.6',
@@ -481,7 +504,7 @@ const AdvancedEditor: React.FC<{
 
       {/* AI Loading Overlay */}
       {isAILoading && (
-        <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center">
+        <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-10">
           <div className="flex items-center space-x-2 text-blue-600">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             <span>AI is processing...</span>
@@ -614,26 +637,30 @@ const AITabModal: React.FC<{
       setUrl('');
       setTitle('');
       setContent('');
+      setAiAnalysis('');
     }
-  }, [editingTab]);
+  }, [editingTab, isOpen]);
 
-  const fetchWithAI = async (url: string) => {
-    if (!url || !onAIAnalyze) return;
+  const fetchWithAI = async () => {
+    if (!url.trim() || !onAIAnalyze) return;
     
     try {
       setIsFetching(true);
+      setAiAnalysis('Analyzing URL content with AI...');
+      
+      let processedUrl = url;
       if (!url.startsWith('http')) {
-        url = 'https://' + url;
+        processedUrl = 'https://' + url;
       }
       
-      const result = await onAIAnalyze(url);
+      const result = await onAIAnalyze(processedUrl);
       setTitle(result.title);
       setContent(result.content);
-      setAiAnalysis('AI has analyzed the content and extracted key information.');
+      setAiAnalysis('✅ AI has successfully analyzed the content and extracted key information.');
       
     } catch (error) {
       console.error('AI Analysis failed:', error);
-      setAiAnalysis('AI analysis failed. Please add content manually.');
+      setAiAnalysis('❌ AI analysis failed. Please add content manually.');
     } finally {
       setIsFetching(false);
     }
@@ -647,9 +674,17 @@ const AITabModal: React.FC<{
         url,
         title: title || new URL(url).hostname,
         content,
-        // favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`
       });
       onClose();
+    }
+  };
+
+  const isValidUrl = (string: string) => {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
     }
   };
 
@@ -669,19 +704,25 @@ const AITabModal: React.FC<{
             />
             <button
               type="button"
-              onClick={() => fetchWithAI(url)}
-              disabled={!url.trim() || isFetching}
+              onClick={fetchWithAI}
+              disabled={!url.trim() || isFetching || !isValidUrl(url.startsWith('http') ? url : 'https://' + url)}
               className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center transition-colors"
             >
               <FiOctagon className="w-4 h-4 mr-2" />
-              AI Analyze
+              {isFetching ? 'Analyzing...' : 'AI Analyze'}
             </button>
           </div>
         </div>
         
         {aiAnalysis && (
-          <div className="p-3 bg-purple-50 border border-purple-200 rounded-lg">
-            <p className="text-sm text-purple-800 flex items-center">
+          <div className={`p-3 rounded-lg border ${
+            aiAnalysis.includes('❌') 
+              ? 'bg-red-50 border-red-200 text-red-800'
+              : aiAnalysis.includes('✅')
+              ? 'bg-green-50 border-green-200 text-green-800'
+              : 'bg-purple-50 border-purple-200 text-purple-800'
+          }`}>
+            <p className="text-sm flex items-center">
               <FiInfo className="w-4 h-4 mr-2" />
               {aiAnalysis}
             </p>
@@ -779,26 +820,34 @@ const AIChat: React.FC<{
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-lg">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((message) => (
-          <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-xs lg:max-w-md rounded-lg p-4 ${
-              message.sender === 'user' 
-                ? 'bg-blue-600 text-white rounded-br-none' 
-                : 'bg-white text-gray-900 rounded-bl-none border border-gray-200 shadow-sm'
-            }`}>
-              {message.sender === 'user' ? (
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-              ) : (
-                <AIResponse content={message.content} />
-              )}
-              <span className={`text-xs block mt-2 ${
-                message.sender === 'user' ? 'text-blue-200' : 'text-gray-500'
-              }`}>
-                {new Date(message.created_at).toLocaleTimeString()}
-              </span>
-            </div>
+        {messages.length === 0 ? (
+          <div className="text-center py-8">
+            <FiMessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Start a conversation with AI</h3>
+            <p className="text-gray-600">Ask questions about your research or use the suggestions below.</p>
           </div>
-        ))}
+        ) : (
+          messages.map((message) => (
+            <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-xs lg:max-w-md rounded-lg p-4 ${
+                message.sender === 'user' 
+                  ? 'bg-blue-600 text-white rounded-br-none' 
+                  : 'bg-white text-gray-900 rounded-bl-none border border-gray-200 shadow-sm'
+              }`}>
+                {message.sender === 'user' ? (
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                ) : (
+                  <AIResponse content={message.content} />
+                )}
+                <span className={`text-xs block mt-2 ${
+                  message.sender === 'user' ? 'text-blue-200' : 'text-gray-500'
+                }`}>
+                  {new Date(message.created_at).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
         {isLoading && (
           <div className="flex justify-start">
             <div className="bg-white text-gray-900 rounded-lg rounded-bl-none p-4 border border-gray-200 shadow-sm">
@@ -815,7 +864,7 @@ const AIChat: React.FC<{
       </div>
 
       {/* Suggested Questions */}
-      {suggestedQuestions.length > 0 && input.length === 0 && (
+      {suggestedQuestions.length > 0 && input.length === 0 && messages.length === 0 && (
         <div className="px-4 pb-2">
           <div className="flex flex-wrap gap-2">
             {suggestedQuestions.map((question, index) => (
@@ -875,7 +924,7 @@ const InviteCollaboratorForm: React.FC<{
     setSuccess(null);
 
     try {
-
+      // Find user by email
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
@@ -888,7 +937,7 @@ const InviteCollaboratorForm: React.FC<{
 
       const userId = userData.id;
 
-
+      // Check if already a collaborator
       const { data: existingCollaborator, error: existingError } = await supabase
         .from('session_collaborators')
         .select('id')
@@ -900,7 +949,7 @@ const InviteCollaboratorForm: React.FC<{
         throw new Error('User is already a collaborator.');
       }
 
-
+      // Add collaborator
       const { error: insertError } = await supabase
         .from('session_collaborators')
         .insert({
@@ -919,17 +968,21 @@ const InviteCollaboratorForm: React.FC<{
         .insert({
           user_id: userId,
           type: 'session_invitation',
-          message: `You have been invited to collaborate on the session "${editedTitle || session?.title}" `,
+          message: `You have been invited to collaborate on the session "${editedTitle || session?.title}"`,
           read: false,
-          updated_at: new Date().toISOString(),
         });
 
       if (notificationError) {
-        throw notificationError;
+        console.warn('Failed to create notification:', notificationError);
       }
 
       setSuccess(`Successfully invited ${email} as a ${role}.`);
       setEmail('');
+
+      // Call callback after a short delay
+      setTimeout(() => {
+        onInviteSent();
+      }, 2000);
 
     } catch (err: any) {
       setError(err.message);
@@ -962,8 +1015,8 @@ const InviteCollaboratorForm: React.FC<{
           onChange={(e) => setRole(e.target.value as 'editor' | 'viewer')}
           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
-          <option value="viewer">Viewer</option>
-          <option value="editor">Editor</option>
+          <option value="viewer">Viewer - Can view content</option>
+          <option value="editor">Editor - Can edit content</option>
         </select>
       </div>
 
@@ -977,6 +1030,87 @@ const InviteCollaboratorForm: React.FC<{
         </button>
       </div>
     </form>
+  );
+};
+
+// Tab Summary Component
+const TabSummary: React.FC<{
+  tab: ITab;
+  summary?: ISummary;
+  onGenerateSummary: (tabId: string, content: string) => Promise<void>;
+  onUpdateSummary: (summaryId: string, updates: Partial<ISummary>) => Promise<void>;
+}> = ({ tab, summary, onGenerateSummary, onUpdateSummary }) => {
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showFullSummary, setShowFullSummary] = useState(false);
+
+  const handleGenerateSummary = async () => {
+    if (!tab.content) return;
+    
+    setIsGenerating(true);
+    try {
+      await onGenerateSummary(tab.id, tab.content);
+    } catch (error) {
+      console.error('Failed to generate summary:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const displaySummary = summary?.summary || 'No summary available.';
+  const shouldTruncate = displaySummary.length > 150 && !showFullSummary;
+  const displayText = shouldTruncate ? displaySummary.substring(0, 150) + '...' : displaySummary;
+
+  return (
+    <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="font-medium text-gray-900 text-sm flex items-center">
+          <FiFileText className="w-4 h-4 mr-2 text-blue-600" />
+          AI Summary
+        </h4>
+        {!summary && (
+          <button
+            onClick={handleGenerateSummary}
+            disabled={isGenerating || !tab.content}
+            className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 disabled:bg-gray-400 transition-colors flex items-center"
+          >
+            {isGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-3 w-3 border-b-1 border-white mr-1"></div>
+                Generating...
+              </>
+            ) : (
+              'Generate Summary'
+            )}
+          </button>
+        )}
+      </div>
+      
+      {summary ? (
+        <div>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+            {displayText}
+          </p>
+          {displaySummary.length > 150 && (
+            <button
+              onClick={() => setShowFullSummary(!showFullSummary)}
+              className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+            >
+              {showFullSummary ? 'Show less' : 'Show more'}
+            </button>
+          )}
+          <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+            <span>Generated {new Date(summary.created_at).toLocaleDateString()}</span>
+            {summary.translator && (
+              <span className="text-green-600">Translated</span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <p className="text-sm text-gray-500">
+          {tab.content ? 'Click "Generate Summary" to create an AI summary of this tab.' : 'No content available for summary.'}
+        </p>
+      )}
+    </div>
   );
 };
 
@@ -1029,36 +1163,46 @@ export default function AdvancedSessionPage() {
     expandContent,
     autoGenerateDraft, 
     chatWithAI,
-    promptAI,
-    initializeAI 
+    analyzeURLContent
   } = useAIService();
-
-
 
   // Enhanced AI Analysis for URLs
   const analyzeURLWithAI = async (url: string) => {
     try {
-      const response = await fetch('/api/summarize-url', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ url }),
-      });
-
+      // First try to fetch the content
+      const response = await fetch('/api/proxy?url=' + encodeURIComponent(url));
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to analyze URL');
+        throw new Error('Failed to fetch URL content');
       }
-
-      const data = await response.json();
+      
+      const html = await response.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      
+      // Extract title and content
+      const title = doc.querySelector('title')?.textContent || 'Untitled';
+      const content = doc.body.textContent?.substring(0, 2000) || 'No content available';
+      
+      // Use AI to analyze and summarize
+      const aiAnalysis = await analyzeURLContent(url);
+      
       return {
-        title: data.title,
-        content: data.summary,
+        title: title,
+        content: aiAnalysis || content
       };
     } catch (error) {
-      console.error('AI Analysis failed:', error);
-      throw new Error('AI analysis failed');
+      console.error('URL analysis failed:', error);
+      // Fallback to direct AI analysis
+      try {
+        const aiAnalysis = await analyzeURLContent(url);
+        return {
+          title: 'AI Analyzed Content',
+          content: aiAnalysis
+        };
+      } catch (aiError) {
+        console.error('AI analysis also failed:', aiError);
+        throw new Error('Failed to analyze URL content');
+      }
     }
   };
 
@@ -1073,7 +1217,6 @@ export default function AdvancedSessionPage() {
           title: tabData.title,
           content: tabData.content,
           user_id: userProfile?.id,
-          // favicon: tabData.favicon
         }])
         .select()
         .single();
@@ -1083,15 +1226,13 @@ export default function AdvancedSessionPage() {
       setTabs(prev => [data, ...prev]);
       setModal({ type: 'success', data: { message: 'Tab created successfully!' } });
       
-      // Auto-generate AI summary
-      if (data.content) {
-        const summary = await generateSummary(data.content, 'tab');
-        await createSummary(data.id, summary);
-        
-        // Suggest AI-generated draft based on new content
-        if (tabs.length > 0) {
-          const aiDraft = await autoGenerateDraft([...tabs, data], 'research synthesis');
-          setAiGeneratedDrafts(prev => [...prev, aiDraft]);
+      // Auto-generate AI summary if content is available
+      if (data.content && data.content.length > 50) {
+        try {
+          const summaryText = await generateSummary(data.content, 'tab');
+          await createSummary(data.id, summaryText);
+        } catch (summaryError) {
+          console.warn('Failed to auto-generate summary:', summaryError);
         }
       }
     } catch (error: any) {
@@ -1107,7 +1248,6 @@ export default function AdvancedSessionPage() {
           url: tabData.url,
           title: tabData.title,
           content: tabData.content,
-          // favicon: tabData.favicon
         })
         .eq('id', tabData.id)
         .select()
@@ -1134,6 +1274,8 @@ export default function AdvancedSessionPage() {
       if (error) throw error;
       
       setTabs(prev => prev.filter(tab => tab.id !== tabId));
+      // Also remove associated summaries
+      setSummaries(prev => prev.filter(summary => summary.tab_id !== tabId));
       setModal({ type: 'success', data: { message: 'Tab deleted successfully!' } });
     } catch (error: any) {
       setModal({ type: 'error', data: { message: error.message || 'Failed to delete tab.' } });
@@ -1155,8 +1297,41 @@ export default function AdvancedSessionPage() {
       if (error) throw error;
       
       setSummaries(prev => [data, ...prev]);
+      return data;
     } catch (error) {
       console.error('Error creating summary:', error);
+      throw error;
+    }
+  };
+
+  const updateSummary = async (summaryId: string, updates: Partial<ISummary>) => {
+    try {
+      const { data, error } = await supabase
+        .from('summaries')
+        .update(updates)
+        .eq('id', summaryId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setSummaries(prev => prev.map(summary => 
+        summary.id === summaryId ? data : summary
+      ));
+      return data;
+    } catch (error) {
+      console.error('Error updating summary:', error);
+      throw error;
+    }
+  };
+
+  const generateTabSummary = async (tabId: string, content: string) => {
+    try {
+      const summaryText = await generateSummary(content, 'tab');
+      await createSummary(tabId, summaryText);
+    } catch (error) {
+      console.error('Error generating tab summary:', error);
+      throw error;
     }
   };
 
@@ -1173,6 +1348,7 @@ export default function AdvancedSessionPage() {
           research_session_id: sessionId,
           content: currentDraft,
           version: draftVersion,
+          user_id: userProfile?.id,
           created_at: new Date().toISOString()
         }])
         .select()
@@ -1210,60 +1386,64 @@ export default function AdvancedSessionPage() {
   };
 
   const sendChatMessage = async (content: string) => {
-const userMessage: ISessionMessage = {
-  id: crypto.randomUUID(),
-  session_id: sessionId,
-  user_id: userProfile?.id,
-  content,
-  sender: 'user',
-  created_at: new Date()
-};
+    if (!userProfile) return;
+
+    const tempId = crypto.randomUUID();
+    const userMessage: ISessionMessage = {
+      id: tempId,
+      session_id: sessionId,
+      user_id: userProfile.id,
+      content,
+      sender: 'user',
+      created_at: new Date().toISOString(),
+    };
+
     setChatMessages(prev => [...prev, userMessage]);
     setIsChatLoading(true);
 
     try {
-      // Save user message
-      const { data: userMsg, error: userErr } = await supabase.from('session_messages').insert(userMessage).select().single();
+      // Save user message to database
+      const { data: userMsg, error: userErr } = await supabase
+        .from('session_messages')
+        .insert(userMessage)
+        .select()
+        .single();
+      
       if (userErr) throw userErr;
 
-      const aiResponse = await chatWithAI(content, { tabs, drafts });
-const aiMessage: ISessionMessage = {
-  id: crypto.randomUUID(),
-  session_id: sessionId,
-  content: aiResponse,
-  sender: 'ai',
-  created_at: new Date()
-};
+      setChatMessages(prev => prev.map(m => m.id === tempId ? userMsg : m));
 
-      // Save AI message
-      const { data: aiMsg, error: aiErr } = await supabase.from('session_messages').insert(aiMessage).select().single();
+      // Get AI response
+      const aiResponse = await chatWithAI(content, { tabs, drafts });
+
+      const aiMessage: Omit<ISessionMessage, 'id' | 'created_at'> = {
+        session_id: sessionId,
+        content: aiResponse,
+        sender: 'ai',
+      };
+
+      const { data: aiMsg, error: aiErr } = await supabase
+        .from('session_messages')
+        .insert(aiMessage)
+        .select()
+        .single();
+      
       if (aiErr) throw aiErr;
 
-      // Create notification
-      const { error: notificationError } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: userProfile?.id,
-          type: 'session_chat_message',
-          message: `You have a new message in the session "${session?.title}" `,
-          read: false,
-          updated_at: new Date().toISOString(),
-        });
+      setChatMessages(prev => [...prev, aiMsg]);
 
-      if (notificationError) {
-        throw notificationError;
-      }
-
-      setChatMessages(prev => [...prev, userMsg, aiMsg]);
-} catch (error) {
-  if (error instanceof Error) {
-    console.error('Error getting AI response:', error.message, error.stack);
-  } else {
-    console.error('Error getting AI response:', JSON.stringify(error));
-  }
-}
-
-finally {
+    } catch (error) {
+      console.error('Error getting AI response:', error);
+      // Add error message to chat
+      const errorMessage: ISessionMessage = {
+        id: crypto.randomUUID(),
+        session_id: sessionId,
+        content: "Sorry, I encountered an error. Please try again.",
+        sender: 'ai',
+        created_at: new Date().toISOString(),
+      };
+      setChatMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsChatLoading(false);
     }
   };
@@ -1278,21 +1458,26 @@ finally {
   };
 
   const handleAIAction = async (action: string, content: string) => {
-    switch (action) {
-      case 'summarize':
-        return await generateSummary(content, 'draft');
-      case 'translate':
-        return await translateContent(content, 'English');
-      case 'rewrite':
-        return await rewriteContent(content, 'academic');
-      case 'expand':
-        return await expandContent(content, 'detailed analysis');
-      case 'simplify':
-        return await rewriteContent(content, 'simple');
-      case 'formalize':
-        return await rewriteContent(content, 'formal');
-      default:
-        return content;
+    try {
+      switch (action) {
+        case 'summarize':
+          return await generateSummary(content, 'draft');
+        case 'translate':
+          return await translateContent(content, 'English');
+        case 'rewrite':
+          return await rewriteContent(content, 'academic');
+        case 'expand':
+          return await expandContent(content, 'detailed analysis');
+        case 'simplify':
+          return await rewriteContent(content, 'simple');
+        case 'formalize':
+          return await rewriteContent(content, 'formal');
+        default:
+          return content;
+      }
+    } catch (error) {
+      console.error('AI Action failed:', error);
+      return 'AI action failed. Please try again.';
     }
   };
 
@@ -1327,6 +1512,7 @@ finally {
     try {
       const aiDraft = await autoGenerateDraft(tabs, 'comprehensive research paper');
       setCurrentDraft(aiDraft);
+      setAiGeneratedDrafts(prev => [...prev, aiDraft]);
       setModal({ type: 'success', data: { message: 'AI draft generated successfully!' } });
     } catch (error) {
       setModal({ type: 'error', data: { message: 'Failed to generate AI draft.' } });
@@ -1353,13 +1539,14 @@ finally {
       setUserProfile(profile);
 
       // Load session
-      const { data: sessionData } = await supabase
+      const { data: sessionData, error: sessionError } = await supabase
         .from('research_sessions')
         .select('*')
         .eq('id', sessionId)
         .single();
 
-      if (!sessionData) {
+      if (sessionError || !sessionData) {
+        console.error('Session not found:', sessionError);
         router.push('/dashboard');
         return;
       }
@@ -1381,27 +1568,37 @@ finally {
         setSessionPermissions(collaborator?.role || 'viewer');
       }
 
-      const [tabsResponse, draftsResponse, collaboratorsResponse, messagesResponse] = await Promise.all([
+      // Load all related data in parallel
+      const [
+        tabsResponse, 
+        draftsResponse, 
+        collaboratorsResponse, 
+        messagesResponse,
+        summariesResponse
+      ] = await Promise.all([
         supabase.from('tabs').select('*').eq('session_id', sessionId).order('created_at', { ascending: false }),
         supabase.from('drafts').select('*').eq('research_session_id', sessionId).order('created_at', { ascending: false }),
         supabase.from('session_collaborators').select('*').eq('session_id', sessionId),
-        supabase.from('session_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
+        supabase.from('session_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true }),
+        supabase.from('summaries').select('*')
       ]);
 
-      if (tabsResponse.data) {
-        setTabs(tabsResponse.data);
-        const tabIds = tabsResponse.data.map(tab => tab.id);
-        if (tabIds.length > 0) {
-          const { data: summariesData } = await supabase.from('summaries').select('*').in('tab_id', tabIds);
-          if (summariesData) setSummaries(summariesData);
+      if (tabsResponse.data) setTabs(tabsResponse.data);
+      if (draftsResponse.data) {
+        setDrafts(draftsResponse.data);
+        // Set the latest draft as current
+        if (draftsResponse.data.length > 0) {
+          setCurrentDraft(draftsResponse.data[0].content);
+          setDraftVersion(draftsResponse.data[0].version + 1);
         }
       }
-      if (draftsResponse.data) setDrafts(draftsResponse.data);
       if (collaboratorsResponse.data) setCollaborators(collaboratorsResponse.data);
       if (messagesResponse.data) setChatMessages(messagesResponse.data);
+      if (summariesResponse.data) setSummaries(summariesResponse.data);
 
     } catch (error) {
       console.error('Error loading session:', error);
+      setModal({ type: 'error', data: { message: 'Failed to load session data.' } });
     } finally {
       setLoading(false);
     }
@@ -1479,6 +1676,7 @@ finally {
                     className="text-3xl font-bold text-gray-900 bg-transparent border-b-2 border-blue-500 focus:outline-none"
                     autoFocus
                     onKeyPress={(e) => e.key === 'Enter' && updateSessionTitle()}
+                    onBlur={updateSessionTitle}
                   />
                   <button onClick={updateSessionTitle} className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors">
                     <FiCheck className="w-5 h-5" />
@@ -1523,7 +1721,11 @@ finally {
                 {collaborators.length + 1} collaborators
               </span>
               <span>•</span>
-              <span className={`flex items-center ${aiStatus === 'ready' ? 'text-green-600' : 'text-yellow-600'}`}>
+              <span className={`flex items-center ${
+                aiStatus === 'ready' ? 'text-green-600' : 
+                aiStatus === 'loading' ? 'text-yellow-600' : 
+                'text-red-600'
+              }`}>
                 <FiCpu className="w-4 h-4 mr-1" />
                 AI: {aiStatus}
               </span>
@@ -1597,11 +1799,11 @@ finally {
                 <div className="flex flex-wrap gap-3">
                   <button 
                     onClick={generateAIDraft}
-                    disabled={tabs.length === 0}
+                    disabled={tabs.length === 0 || isAIGenerating}
                     className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center transition-colors"
                   >
                     <FiFileText className="w-4 h-4 mr-2" />
-                    Generate Draft
+                    {isAIGenerating ? 'Generating...' : 'Generate Draft'}
                   </button>
                   <button 
                     onClick={() => {
@@ -1643,73 +1845,76 @@ finally {
               <div className="p-6">
                 {tabs.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {tabs.map((tab) => (
-                      <div key={tab.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors group">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex items-center space-x-2">
-                            {/* <img 
-                              src={tab.favicon} 
-                              alt="" 
-                              className="w-4 h-4" 
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/images/default-favicon.png';
-                              }}
-                            /> */}
-                            <h3 className="font-semibold text-gray-900 truncate flex-1">{tab.title || 'Untitled'}</h3>
+                    {tabs.map((tab) => {
+                      const tabSummary = summaries.find(s => s.tab_id === tab.id);
+                      return (
+                        <div key={tab.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors group">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center space-x-2 min-w-0 flex-1">
+                              <h3 className="font-semibold text-gray-900 truncate">{tab.title || 'Untitled'}</h3>
+                            </div>
+                            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                              <a 
+                                href={tab.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Open in new tab"
+                              >
+                                <FiExternalLink className="w-4 h-4" />
+                              </a>
+                              {(sessionPermissions === 'owner' || sessionPermissions === 'editor') && (
+                                <>
+                                  <button 
+                                    onClick={() => {
+                                      setEditingTab(tab);
+                                      setShowTabModal(true);
+                                    }}
+                                    className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                                    title="Edit tab"
+                                  >
+                                    <FiEdit2 className="w-4 h-4" />
+                                  </button>
+                                  <button 
+                                    onClick={() => deleteTab(tab.id)} 
+                                    className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                                    title="Delete tab"
+                                  >
+                                    <FiTrash2 className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <a 
-                              href={tab.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer" 
-                              className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-                              title="Open in new tab"
-                            >
-                              <FiExternalLink className="w-4 h-4" />
-                            </a>
-                            {(sessionPermissions === 'owner' || sessionPermissions === 'editor') && (
-                              <>
-                                <button 
-                                  onClick={() => {
-                                    setEditingTab(tab);
-                                    setShowTabModal(true);
-                                  }}
-                                  className="p-1 text-gray-400 hover:text-green-600 transition-colors"
-                                  title="Edit tab"
-                                >
-                                  <FiEdit2 className="w-4 h-4" />
-                                </button>
-                                <button 
-                                  onClick={() => deleteTab(tab.id)} 
-                                  className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                                  title="Delete tab"
-                                >
-                                  <FiTrash2 className="w-4 h-4" />
-                                </button>
-                              </>
+                          
+                          <p className="text-sm text-gray-600 truncate mb-2">{tab.url}</p>
+                          
+                          {tab.content && (
+                            <div className="mb-3">
+                              <p className="text-sm text-gray-700 line-clamp-3">{tab.content}</p>
+                            </div>
+                          )}
+                          
+                          {/* Tab Summary */}
+                          <TabSummary
+                            tab={tab}
+                            summary={tabSummary}
+                            onGenerateSummary={generateTabSummary}
+                            onUpdateSummary={updateSummary}
+                          />
+                          
+                          <div className="flex items-center justify-between text-xs text-gray-500 mt-2">
+                            <span>Added {new Date(tab.created_at).toLocaleDateString()}</span>
+                            {tabSummary && (
+                              <span className="text-green-600 flex items-center">
+                                <FiCheck className="w-3 h-3 mr-1" />
+                                AI Summarized
+                              </span>
                             )}
                           </div>
                         </div>
-                        
-                        <p className="text-sm text-gray-600 truncate mb-2">{tab.url}</p>
-                        
-                        {tab.content && (
-                          <div className="mb-3">
-                            <p className="text-sm text-gray-700 line-clamp-3">{tab.content}</p>
-                          </div>
-                        )}
-                        
-                        <div className="flex items-center justify-between text-xs text-gray-500">
-                          <span>Added {new Date(tab.created_at).toLocaleDateString()}</span>
-                          {summaries.find(s => s.tab_id === tab.id) && (
-                            <span className="text-green-600 flex items-center">
-                              <FiCheck className="w-3 h-3 mr-1" />
-                              AI Summarized
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-12">
@@ -1741,11 +1946,11 @@ finally {
                 <div className="flex items-center space-x-2">
                   <button 
                     onClick={generateAIDraft}
-                    disabled={tabs.length === 0}
+                    disabled={tabs.length === 0 || isAIGenerating}
                     className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-gray-400 flex items-center transition-colors"
                   >
                     <FiZap className="w-4 h-4 mr-2" />
-                    AI Generate
+                    {isAIGenerating ? 'Generating...' : 'AI Generate'}
                   </button>
                   <button 
                     onClick={saveDraft}
@@ -1834,6 +2039,19 @@ finally {
                       className="text-sm text-gray-600 line-clamp-3 prose prose-sm"
                       dangerouslySetInnerHTML={{ __html: draft.content.substring(0, 200) + '...' }}
                     />
+                    <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                      <span>By {draft.user_id === userProfile?.id ? 'You' : 'Collaborator'}</span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentDraft(draft.content);
+                          setDraftVersion(draft.version + 1);
+                        }}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        Restore
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {drafts.length === 0 && (
@@ -1857,9 +2075,13 @@ finally {
                   <p className="text-sm text-gray-600">Ask questions about your research content</p>
                 </div>
                 <div className={`px-3 py-1 rounded-full text-xs font-medium ${
-                  aiStatus === 'ready' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                  aiStatus === 'ready' ? 'bg-green-100 text-green-800' : 
+                  aiStatus === 'loading' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
                 }`}>
-                  {aiStatus === 'ready' ? 'AI Ready' : 'AI Loading...'}
+                  {aiStatus === 'ready' ? 'AI Ready' : 
+                   aiStatus === 'loading' ? 'AI Loading...' :
+                   'AI Unavailable'}
                 </div>
               </div>
             </div>
@@ -2012,6 +2234,7 @@ finally {
         )}
       </div>
 
+      {/* Loading Modal */}
       <Modal
         isOpen={isAIGenerating}
         onClose={() => {}}
@@ -2035,18 +2258,20 @@ finally {
         onAIAnalyze={analyzeURLWithAI}
       />
 
+      {/* Invite Collaborator Modal */}
       <Modal
         isOpen={modal.type === 'invite-collaborator'}
         onClose={() => setModal({ type: '' })}
         title="Invite Collaborators"
         size="md"
       >
-                      <InviteCollaboratorForm 
-                        sessionId={sessionId} 
-                        onInviteSent={() => setModal({ type: '' })} 
-                        editedTitle={editedTitle}
-                        session={session}
-                      />      </Modal>
+        <InviteCollaboratorForm 
+          sessionId={sessionId} 
+          onInviteSent={() => setModal({ type: '' })} 
+          editedTitle={editedTitle}
+          session={session}
+        />
+      </Modal>
 
       {/* Success/Error Modals */}
       <Modal
@@ -2071,6 +2296,7 @@ finally {
         </div>
       </Modal>
 
+      {/* PDF Export Modal */}
       {showPDFModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
