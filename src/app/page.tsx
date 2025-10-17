@@ -24,7 +24,7 @@ import {
   FiLinkedin
 } from 'react-icons/fi';
 
-export default function TabwiseLanding() {
+export default function GugelLanding() {
   const [darkMode, setDarkMode] = useState(false);
   const [activeFeature, setActiveFeature] = useState(0);
 
@@ -40,39 +40,39 @@ export default function TabwiseLanding() {
 
   const features = [
     {
-      icon: FiSearch,
-      title: "Collect Tabs",
-      description: "Capture your open browser tabs, including URL, title, and content, and save them into organized research sessions.",
+      icon: FiUsers,
+      title: "Collaborative Research Sessions",
+      description: "Create shared research sessions with your team, keeping all your resources in one place.",
       color: "from-blue-500 to-cyan-500"
     },
     {
       icon: FiZap,
-      title: "AI-Powered Summaries",
-      description: "Use on-device AI (Gemini Nano) to automatically summarize articles, extract key points, and generate citations.",
+      title: "AI-Powered Insights",
+      description: "Automatically summarize articles, get key insights, and generate citations with built-in AI.",
       color: "from-purple-500 to-pink-500"
     },
     {
       icon: FiEdit,
-      title: "Rich Text Editor",
-      description: "Organize findings, write drafts, and format research with a full-featured rich text editor.",
+      title: "Collaborative Drafting",
+      description: "Write, edit, and comment on research drafts with your team in real-time.",
       color: "from-green-500 to-emerald-500"
     },
     {
       icon: FiUsers,
-      title: "Team Collaboration",
-      description: "Work with your team in real-time, share research sessions, and collaborate on drafts.",
+      title: "Team Management",
+      description: "Organize your team, manage members, and control access to research sessions.",
       color: "from-orange-500 to-red-500"
     },
     {
       icon: FiDownload,
-      title: "Export to PDF",
-      description: "Export research sessions and drafts to PDF for easy sharing and archiving.",
+      title: "Export Your Work",
+      description: "Export your research sessions and drafts to various formats for easy sharing and archiving.",
       color: "from-indigo-500 to-blue-500"
     },
     {
       icon: FiLock,
       title: "Privacy First",
-      description: "All AI processing happens on-device with Gemini Nano. Your data never leaves your browser.",
+      description: "Your data is your own. We are committed to protecting your privacy.",
       color: "from-gray-600 to-gray-700"
     }
   ];
@@ -81,7 +81,7 @@ export default function TabwiseLanding() {
     { name: "Next.js", description: "React framework for production" },
     { name: "Tailwind CSS", description: "Utility-first CSS framework" },
     { name: "Supabase", description: "Open source Firebase alternative" },
-    { name: "Gemini Nano", description: "On-device AI by Google" },
+    { name: "Gemini", description: "AI by Google" },
     { name: "Chrome Extension", description: "Browser integration" },
     { name: "TypeScript", description: "Type-safe JavaScript" }
   ];
@@ -89,27 +89,27 @@ export default function TabwiseLanding() {
   const steps = [
     {
       step: "1",
-      title: "Install Extension",
-      description: "Add Tabwise to Chrome in one click",
+      title: "Create a Session",
+      description: "Start a new research session for your project.",
       icon: FiChrome
     },
     {
       step: "2",
-      title: "Collect Tabs",
-      description: "Capture all your open research tabs",
-      icon: FiSearch
+      title: "Invite Your Team",
+      description: "Invite collaborators to join your session.",
+      icon: FiUsers
     },
     {
       step: "3",
-      title: "AI Processing",
-      description: "Get instant summaries with Gemini Nano",
-      icon: FiZap
+      title: "Gather Resources",
+      description: "Add articles, notes, and other resources to your session.",
+      icon: FiSearch
     },
     {
       step: "4",
-      title: "Export & Share",
-      description: "Create polished research documents",
-      icon: FiDownload
+      title: "Collaborate & Draft",
+      description: "Work together on drafts and get AI-powered insights.",
+      icon: FiEdit
     }
   ];
 
@@ -142,10 +142,10 @@ export default function TabwiseLanding() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">T</span>
+                <span className="text-white font-bold text-lg">G</span>
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Tabwise
+                Gugel
               </span>
             </div>
 
@@ -170,7 +170,7 @@ export default function TabwiseLanding() {
               </button>
               
               <a 
-                href="https://github.com/Rafiadnan0666/tabwise"
+                href="/sign-up"
                 className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg font-medium hover:shadow-lg transition-all"
               >
                 Get Started
@@ -183,42 +183,33 @@ export default function TabwiseLanding() {
       {/* Hero Section */}
       <section className="relative py-20 px-6 overflow-hidden">
         <div className="container mx-auto max-w-6xl text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full text-sm font-medium mb-6">
-            <FiStar className="text-yellow-500" />
-            Built for Google Chrome AI Challenge 2025
-          </div>
-
           <h1 className="text-5xl md:text-7xl font-bold text-gray-900 dark:text-white mb-6">
-            Turn Chaotic Tabs into
+            Collaborative Research, 
             <span className="block bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Organized Research
+              Made Simple.
             </span>
           </h1>
 
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Tabwise is a research assistant that helps you transform messy browser tabs into polished research sessions 
-            using client-side AI. Built with Gemini Nano for complete privacy and offline capability.
+            Gugel is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
             <a 
-              href="https://github.com/Rafiadnan0666/tabwise"
+              href="/sign-up"
               className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-semibold hover:shadow-xl transition-all flex items-center gap-2"
             >
-              <FiGithub />
-              Star on GitHub
+              Sign Up for Free
             </a>
             <a 
-              href="#install"
+              href="#features"
               className="px-8 py-4 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl font-semibold hover:border-blue-500 transition-all flex items-center gap-2"
             >
-              <FiChrome />
-              Install Extension
+              Learn More
             </a>
           </div>
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-8 max-w-4xl mx-auto">
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">Created by Rafi Adnan</div>
             <div className="flex items-center justify-center gap-6 text-gray-600 dark:text-gray-300">
               <div className="flex items-center gap-2">
                 <FiCode className="text-blue-500" />
@@ -230,7 +221,7 @@ export default function TabwiseLanding() {
               </div>
               <div className="flex items-center gap-2">
                 <FiZap className="text-yellow-500" />
-                <span>On-Device AI</span>
+                <span>AI Powered</span>
               </div>
             </div>
           </div>
@@ -242,10 +233,10 @@ export default function TabwiseLanding() {
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-              Powerful Research Features
+              A Better Way to Research
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Everything you need to transform your browsing sessions into organized research
+              Gugel provides the tools you need to streamline your research workflow.
             </p>
           </div>
 
@@ -262,10 +253,10 @@ export default function TabwiseLanding() {
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-              How Tabwise Works
+              How Gugel Works
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300">
-              Simple steps from chaotic tabs to polished research
+              A simple process to supercharge your research.
             </p>
           </div>
 
@@ -322,7 +313,7 @@ export default function TabwiseLanding() {
             Get Started in Minutes
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Start organizing your research with Tabwise today
+            Start your collaborative research journey with Gugel today.
           </p>
 
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8">
@@ -332,7 +323,7 @@ export default function TabwiseLanding() {
                 <ol className="space-y-3 text-sm">
                   <li className="flex items-center gap-2">
                     <FiCheck className="text-green-300" />
-                    <code>git clone https://github.com/Rafiadnan0666/tabwise.git</code>
+                    <code>git clone https://github.com/Rafiadnan0666/gugel.git</code>
                   </li>
                   <li className="flex items-center gap-2">
                     <FiCheck className="text-green-300" />
@@ -366,14 +357,14 @@ export default function TabwiseLanding() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a 
-              href="https://github.com/Rafiadnan0666/tabwise"
+              href="https://github.com/Rafiadnan0666/gugel"
               className="px-6 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:shadow-lg transition-all flex items-center gap-2"
             >
               <FiGithub />
               View on GitHub
             </a>
             <a 
-              href="https://github.com/Rafiadnan0666/tabwise#readme"
+              href="https://github.com/Rafiadnan0666/gugel#readme"
               className="px-6 py-3 bg-transparent border border-white text-white rounded-lg font-semibold hover:bg-white/10 transition-all"
             >
               Read Documentation
@@ -387,41 +378,17 @@ export default function TabwiseLanding() {
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-              About the Project
+              About Gugel
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300">
-              Built with passion for the Google Chrome Built-in AI Challenge 2025
+              Gugel is an open-source collaborative research platform.
             </p>
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center text-white text-2xl font-bold">
-                RA
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">Rafi Adnan</h3>
-                <p className="text-gray-600 dark:text-gray-300">Full-stack Developer & Creator</p>
-              </div>
-            </div>
-            
             <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-              Tabwise was created to solve the problem of research tab overload. As a developer who frequently 
-              works on multiple projects and research topics, I found myself drowning in browser tabs. This 
-              project leverages Chrome's built-in AI capabilities to provide a privacy-focused solution that 
-              works entirely on-device.
+              Gugel was created to streamline the research process for teams. We believe that by providing a unified platform for collaboration, we can help researchers save time and produce better results.
             </p>
-
-            <div className="flex gap-4">
-              <a href="https://github.com/Rafiadnan0666" className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-blue-500 transition-colors">
-                <FiGithub />
-                GitHub
-              </a>
-              <a href="https://rafiadnan.my.id" className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-blue-500 transition-colors">
-                <FiExternalLink />
-                Portfolio
-              </a>
-            </div>
           </div>
         </div>
       </section>
@@ -433,12 +400,12 @@ export default function TabwiseLanding() {
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold">T</span>
+                  <span className="text-white font-bold">G</span>
                 </div>
-                <span className="text-xl font-bold">Tabwise</span>
+                <span className="text-xl font-bold">Gugel</span>
               </div>
               <p className="text-gray-400 text-sm">
-                Turn chaotic browser tabs into organized research sessions with AI-powered summarization.
+                Collaborative Research, Made Simple.
               </p>
             </div>
 
@@ -455,26 +422,24 @@ export default function TabwiseLanding() {
             <div>
               <h4 className="font-semibold mb-4">Resources</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="https://github.com/Rafiadnan0666/tabwise" className="hover:text-white transition-colors">GitHub Repository</a></li>
-                <li><a href="https://github.com/Rafiadnan0666/tabwise#readme" className="hover:text-white transition-colors">Documentation</a></li>
-                <li><a href="https://developer.chrome.com/docs/ai" className="hover:text-white transition-colors">Chrome AI Docs</a></li>
-                <li><a href="https://devpost.com" className="hover:text-white transition-colors">Devpost</a></li>
+                <li><a href="https://github.com/Rafiadnan0666/gugel" className="hover:text-white transition-colors">GitHub Repository</a></li>
+                <li><a href="https://github.com/Rafiadnan0666/gugel#readme" className="hover:text-white transition-colors">Documentation</a></li>
               </ul>
             </div>
 
             <div>
               <h4 className="font-semibold mb-4">Connect</h4>
               <div className="flex gap-4">
-                <a href="https://github.com/Rafiadnan0666" className="text-gray-400 hover:text-white transition-colors">
+                <a href="#" className="text-gray-400 hover:text-white transition-colors">
                   <FiGithub size={20} />
                 </a>
-                <a href="https://twitter.com" className="text-gray-400 hover:text-white transition-colors">
+                <a href="#" className="text-gray-400 hover:text-white transition-colors">
                   <FiTwitter size={20} />
                 </a>
-                <a href="https://linkedin.com" className="text-gray-400 hover:text-white transition-colors">
+                <a href="#" className="text-gray-400 hover:text-white transition-colors">
                   <FiLinkedin size={20} />
                 </a>
-                <a href="mailto:rafi@example.com" className="text-gray-400 hover:text-white transition-colors">
+                <a href="#" className="text-gray-400 hover:text-white transition-colors">
                   <FiMail size={20} />
                 </a>
               </div>
@@ -482,7 +447,7 @@ export default function TabwiseLanding() {
           </div>
 
           <div className="border-t border-gray-800 pt-8 text-center text-gray-400 text-sm">
-            <p>© 2025 Tabwise. Created by Rafi Adnan for Google Chrome Built-in AI Challenge 2025. MIT Licensed.</p>
+            <p>© 2025 Gugel. All rights reserved.</p>
           </div>
         </div>
       </footer>

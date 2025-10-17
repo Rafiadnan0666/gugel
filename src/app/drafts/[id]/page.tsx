@@ -150,9 +150,9 @@ export default function DraftEditPage() {
       
       if (data) {
         const collaboratorProfiles = data
-          .filter(item => item.profiles)
-          .map(item => item.profiles as IProfile);
-        setCollaborators(collaboratorProfiles);
+          .map(item => item.profiles)
+          .filter(Boolean);
+        setCollaborators(collaboratorProfiles.flat() as IProfile[]);
       }
     } catch (error) {
       console.error('Error in loadCollaborators:', error);

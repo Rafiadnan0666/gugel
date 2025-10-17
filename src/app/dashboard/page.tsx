@@ -129,7 +129,7 @@ export default function Dashboard() {
           .order('created_at', { ascending: false }),
         supabase
           .from('team_members')
-          .select('team_id, teams(*)')
+          .select('teams(*)')
           .eq('user_id', user.id),
         supabase
           .from('tabs')
@@ -148,14 +148,14 @@ export default function Dashboard() {
       ]);
 
       const sessionsData = sessionsResponse.data || [];
-      const teamsData = teamsResponse.data?.map(t => t.teams) || [];
+      const teamsData = teamsResponse.data?.map((t) => t.teams).filter(Boolean).flat() as ITeam[] || [];
       const tabsData = tabsResponse.data || [];
       const draftsData = draftsResponse.data || [];
       const recentDraftsData = recentDraftsResponse.data || [];
 
       setSessions(sessionsData);
       setFilteredSessions(sessionsData);
-      setTeams(teamsData as ITeam[]);
+      setTeams(teamsData);
       setTabs(tabsData);
       setDrafts(recentDraftsData);
 
@@ -258,7 +258,7 @@ export default function Dashboard() {
   // Generate AI suggestions
   const generateAISuggestions = async (sessionsData: IResearchSession[], tabsData: ITab[], draftsData: IDraft[]) => {
     const prompt = `As a research assistant, provide 3 concise, actionable suggestions based on: ${sessionsData.length} research sessions, ${tabsData.length} collected tabs, and ${draftsData.length} drafts. Focus on productivity and research improvement.`;
-    const result = await chatWithAI(prompt, { sessions: sessionsData, tabs: tabsData, drafts: draftsData });
+    const result = await chatWithAI(prompt, { tabs: tabsData, drafts: draftsData });
     const suggestions = result.split('\n')
       .filter(line => line.trim().length > 0)
       .map(line => line.replace(/^\d+\.\s*|\*\*|[-•]\s*/g, '').trim())
@@ -379,7 +379,7 @@ export default function Dashboard() {
     setChatMessages(prev => [...prev, userMessage]);
     setChatInput('');
 
-    const aiResponse = await chatWithAI(chatInput, { sessions, tabs, drafts });
+    const aiResponse = await chatWithAI(chatInput, { tabs, drafts });
     const aiMessage: ChatMessage = { 
       id: (Date.now() + 1).toString(), 
       content: aiResponse, 
@@ -648,7 +648,7 @@ export default function Dashboard() {
                         <div className="flex-1">
                           <h3 className="font-semibold text-lg text-gray-900 mb-1">{session.title}</h3>
                           <p className="text-sm text-gray-600">
-                            Created {formatDate(session.created_at)}
+                            Created {formatDate(session.created_at.toString())}
                           </p>
                           <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
                             <span className="flex items-center">
@@ -692,7 +692,7 @@ export default function Dashboard() {
                           </span>
                         </div>
                         <p className="text-xs text-gray-600">
-                          Updated {formatRelativeTime(draft.updated_at)}
+                          Updated {formatRelativeTime(draft.updated_at.toString())}
                         </p>
                       </div>
                     ))
@@ -773,7 +773,7 @@ export default function Dashboard() {
                       <p className="text-gray-600 text-xs">{session.title}</p>
                     </div>
                     <span className="text-gray-500 text-xs ml-auto">
-                      {formatRelativeTime(session.created_at)}
+                      {formatRelativeTime(session.created_at.toString())}
                     </span>
                   </div>
                 ))}

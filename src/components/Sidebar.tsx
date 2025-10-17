@@ -367,11 +367,9 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
           <nav className="flex-1 overflow-y-auto py-2">
             <ul className="space-y-1 px-2">
               <NavItem href="/dashboard" icon={<FiHome className="text-lg" />} label="Dashboard" exact />
-              <NavItem href="/ai" icon={<FiMessageSquare className="text-lg" />} label="AI Chat" />
               <Dropdown title="Research" icon={<FiArchive className="text-lg" />} items={researchSessions} pathPrefix="/session" nameKey="title" createPath="/research/new" />
               <Dropdown title="Teams" icon={<FiUsers className="text-lg" />} items={teams} pathPrefix="/team" nameKey="name" createPath="/team/create" />
               <NavItem href="/drafts" icon={<FiBook className="text-lg" />} label="Drafts" />
-              <NavItem href="/blogs" icon={<FiActivity className="text-lg" />} label="Blogs" />
               <NavItem href="/notifications" icon={<FiBell className="text-lg" />} label="Notifications" />
               <NavItem href="/settings" icon={<FiSettings className="text-lg" />} label="Settings" />
             </ul>

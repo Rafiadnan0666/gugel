@@ -19,7 +19,7 @@ export default function RootLayout({ children }) {
         <meta name="google-adsense-account" content="ca-pub-6910980494327419" />
         <link rel="manifest" href="/manifest.ts" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`} suppressHydrationWarning>
         {children}
 
         {/* Google Analytics */}
