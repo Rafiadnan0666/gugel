@@ -1,8 +1,12 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
+<<<<<<< HEAD
+  const cookieStore = cookies();
+  const supabase = createServerComponentClient({ cookies: () => cookieStore });
+=======
   const cookieStore = await cookies();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,6 +19,7 @@ export async function GET(request: Request) {
       },
     }
   );
+>>>>>>> 62894e5feb2d5b345c83a06860f12b138cf119f0
 
   const { data: { user }, error: userError } = await supabase.auth.getUser();
 
@@ -48,6 +53,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Title is required' }, { status: 400 });
     }
 
+<<<<<<< HEAD
+    const cookieStore = cookies();
+    const supabase = createServerComponentClient({ cookies: () => cookieStore });
+=======
     const cookieStore = await cookies();
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -60,6 +69,7 @@ export async function POST(request: Request) {
             },
         }
     );
+>>>>>>> 62894e5feb2d5b345c83a06860f12b138cf119f0
 
     const { data: { user }, error: userError } = await supabase.auth.getUser();
 

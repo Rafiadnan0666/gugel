@@ -5,9 +5,9 @@ import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import type { ITeam, ITeamMember, IProfile } from '@/types/main.db';
 import { 
-  FiPlus, FiUsers, FiUser, FiEdit2, FiTrash2, 
-  FiChevronRight, FiGlobe, FiLock, FiSearch,
-  FiX, FiSettings, FiArrowLeft, FiAlertCircle
+  FiPlus, FiUsers, FiUser, 
+  FiChevronRight, FiGlobe, FiLock,
+  FiX, FiSettings, FiAlertCircle
 } from 'react-icons/fi';
 
 // Extended interface to include joined team data

@@ -211,7 +211,7 @@ export default function TeamPage() {
     };
   }, [teamId, isMember, supabase]);
 
-  const handleNewMessage = async (message: ITeamMessage) => {
+  const handleNewMessage = async (message: any) => {
     const { data: profile } = await supabase
       .from('profiles')
       .select('*')
@@ -219,14 +219,12 @@ export default function TeamPage() {
       .single();
 
     if (profile) {
-      const newMessage = { ...message, profiles: profile };
+      const newMessage: ITeamMessage = { ...message, profiles: profile };
       setTeamMessages(prev => [...prev, newMessage]);
       
       if (activeTab !== 'chat') {
         setUnreadMessages(prev => prev + 1);
       }
-
-
     }
   };
 

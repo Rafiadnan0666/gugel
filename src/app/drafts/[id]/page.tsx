@@ -12,6 +12,19 @@ interface IDraftWithResearchSession extends IDraft {
   profiles?: IProfile;
 }
 
+<<<<<<< HEAD
+interface IComment {
+  id: string;
+  content: string;
+  created_at?: string;
+  profiles: {
+    avatar_url: string;
+    full_name: string;
+  };
+}
+
+=======
+>>>>>>> 62894e5feb2d5b345c83a06860f12b138cf119f0
 import {
   FiArrowLeft, FiSave, FiDownload, FiCpu, FiX,
   FiUsers, FiClock, FiMessageSquare, FiShare2,
@@ -471,11 +484,66 @@ Frequently asked questions and answers...`
         return;
       }
       
+<<<<<<< HEAD
+      if (data) {
+        const collaboratorProfiles = data
+          .map(item => item.profiles)
+          .filter(Boolean);
+        setCollaborators(collaboratorProfiles.flat() as IProfile[]);
+      }
+    } catch (error) {
+      console.error('Error in loadCollaborators:', error);
+    }
+  };
+
+  const loadHistory = async () => {
+    if (!draft) return;
+    try {
+      const { data, error } = await supabase
+        .from('drafts')
+        .select('*')
+        .eq('research_session_id', draft.research_session_id)
+        .order('version', { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Error loading history:', error);
+        return;
+      }
+      setHistory(data || []);
+    } catch (error) {
+      console.error('Error in loadHistory:', error);
+    }
+  };
+
+  const loadComments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('comments')
+        .select('*, profiles(full_name, avatar_url)')
+        .eq('draft_id', draftId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error loading comments:', error);
+        return;
+      }
+      setComments(data || []);
+    } catch (error) {
+      console.error('Error in loadComments:', error);
+    }
+  };
+
+  const loadDraft = async () => {
+    try {
+      console.log('Loading draft with ID:', draftId);
+=======
       const collaboratorProfiles: IProfile[] = (data || [])
         .map(item => item.profiles)
         .filter((profile): profile is IProfile => 
           profile !== null && typeof profile === 'object'
         );
+>>>>>>> 62894e5feb2d5b345c83a06860f12b138cf119f0
       
       setCollaborators(collaboratorProfiles);
     } catch (error) {

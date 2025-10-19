@@ -1,16 +1,17 @@
-# Tabwise — Research, Summarize, and Ship
+# Gugel — Collaborative Research, Made Simple.
 
-Tabwise is a research assistant that helps you turn your messy browser tabs into organized research sessions. It uses client-side AI (Gemini Nano / Chrome Built-in AI) to summarize content, generate insights, and help you produce polished, ready-to-submit Devpost demos.
+Gugel is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place.
 
 ## Key Features
 
-- **Collect Tabs:** Capture your open browser tabs, including URL, title, and content, and save them into organized research sessions.
-- **AI-Powered Summaries:** Use the power of on-device AI to automatically summarize long articles, extract key points, and generate citations.
-- **Rich Text Editor:** Organize your findings, write drafts, and format your research with a full-featured rich text editor.
-- **Team Collaboration:** Work with your team in real-time, share research sessions, and collaborate on drafts.
-- **AI Assistant:** Get intelligent suggestions and insights about your research from the built-in AI assistant.
+- **Collaborative Research Sessions:** Create shared research sessions with your team, keeping all your resources in one place.
+- **AI-Powered Insights:** Automatically summarize articles, get key insights, and generate citations with built-in AI.
+- **Collaborative Drafting:** Write, edit, and comment on research drafts with your team in real-time.
+- **Team Management:** Organize your team, manage members, and control access to research sessions.
+- **Real-time Collaboration:** See who's online and what they are working on.
+- **Notifications:** Stay up-to-date with the latest activity in your research sessions.
 - **Dark/Light Mode:** Choose your preferred theme, which automatically syncs with your system preference.
-- **Export to PDF:** Export your research sessions and drafts to PDF for easy sharing and archiving.
+- **Export Your Work:** Export your research sessions and drafts to various formats for easy sharing and archiving.
 
 ## Tech Stack
 
@@ -18,7 +19,7 @@ Tabwise is a research assistant that helps you turn your messy browser tabs into
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/)
 - **Database:** [Supabase](https://supabase.io/) (PostgreSQL)
 - **Authentication:** [Supabase Auth](https://supabase.io/docs/guides/auth)
-- **On-Device AI:** [Gemini Nano](https://ai.google.dev/docs/gemini_nano) (via Chrome's built-in AI)
+- **AI:** [Google Gemini](https://ai.google.dev/)
 
 ## Getting Started
 
@@ -33,8 +34,8 @@ Tabwise is a research assistant that helps you turn your messy browser tabs into
 1.  **Clone the repository:**
 
     ```bash
-    git clone https://github.com/your-username/tabwise.git
-    cd tabwise
+    git clone https://github.com/your-username/gugel.git
+    cd gugel
     ```
 
 2.  **Install dependencies:**
@@ -62,7 +63,7 @@ Tabwise is a research assistant that helps you turn your messy browser tabs into
 
 ## Browser Extension
 
-Tabwise also comes with a browser extension to make it even easier to collect your tabs.
+Gugel also comes with a browser extension to make it even easier to collect your tabs and resources.
 
 ### To install the extension:
 

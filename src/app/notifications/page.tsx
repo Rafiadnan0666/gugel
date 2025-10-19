@@ -95,7 +95,7 @@ export default function Notifications() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [handleScroll]);
 
-  const markAsRead = async (notificationId: string) => {
+  const markAsRead = async (notificationId: number) => {
     try {
       const { error } = await supabase
         .from('notifications')

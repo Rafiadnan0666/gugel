@@ -1,25 +1,22 @@
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Script from "next/script";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const inter = Inter({ subsets: ["latin"] });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+export const metadata = {
+  title: "Tabwise Suit",
+  description: "An intelligent research assistant and collaborative workspace",
+};
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta name="google-adsense-account" content="ca-pub-6910980494327419" />
-        <link rel="manifest" href="/manifest.ts" />
+        <link rel="manifest" href="/manifest.json" />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`} suppressHydrationWarning>
+      <body className={`${inter.className} antialiased bg-background text-foreground`} suppressHydrationWarning>
         {children}
 
         {/* Google Analytics */}

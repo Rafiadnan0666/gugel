@@ -13,7 +13,7 @@ const addHeader = (doc: jsPDF, title: string) => {
 };
 
 const addFooter = (doc: jsPDF) => {
-  const pageCount = doc.internal.getNumberOfPages();
+  const pageCount = (doc.internal as any).getNumberOfPages();
   doc.setFontSize(10);
   doc.setTextColor(150);
   for (let i = 1; i <= pageCount; i++) {

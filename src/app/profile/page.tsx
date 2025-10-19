@@ -31,6 +31,7 @@ export default function ProfilePage() {
     full_name: '',
     avatar_url: '',
     email: '',
+    settings: {},
   });
   const [saveError, setSaveError] = useState<string | null>(null);
 
