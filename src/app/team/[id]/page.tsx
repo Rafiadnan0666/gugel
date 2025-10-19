@@ -179,7 +179,7 @@ export default function TeamPage() {
           filter: `team_id=eq.${teamId}`
         }, 
         (payload) => {
-          handleNewMessage(payload.new);
+          handleNewMessage(payload.new as ITeamMessage);
         }
       )
       .on('postgres_changes',

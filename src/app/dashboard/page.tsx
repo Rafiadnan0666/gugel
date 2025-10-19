@@ -148,7 +148,11 @@ export default function Dashboard() {
       ]);
 
       const sessionsData = sessionsResponse.data || [];
+<<<<<<< HEAD
       const teamsData = teamsResponse.data?.map((t) => t.teams).filter(Boolean).flat() as ITeam[] || [];
+=======
+      const teamsData = teamsResponse.data?.flatMap(t => t.teams).filter(Boolean) as ITeam[] || [];
+>>>>>>> 62894e5feb2d5b345c83a06860f12b138cf119f0
       const tabsData = tabsResponse.data || [];
       const draftsData = draftsResponse.data || [];
       const recentDraftsData = recentDraftsResponse.data || [];
@@ -390,7 +394,7 @@ export default function Dashboard() {
   };
 
   // Format date helper
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     return new Date(dateString).toLocaleDateString('en-US', { 
       month: 'short', 
       day: 'numeric', 
@@ -399,7 +403,7 @@ export default function Dashboard() {
   };
 
   // Format relative time
-  const formatRelativeTime = (dateString: string) => {
+  const formatRelativeTime = (dateString: string | Date) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
