@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import type { INotification } from '@/types/main.db';
-import { FiBell, FiCheck } from 'react-icons/fi';
+import { FiBell } from 'react-icons/fi';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -16,7 +16,7 @@ export default function NotificationBell() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data, error, count } = await supabase
+    const { data, error } = await supabase
       .from('notifications')
       .select('*', { count: 'exact' })
       .eq('user_id', user.id)
@@ -38,13 +38,14 @@ export default function NotificationBell() {
   }, [supabase]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotifications();
   }, [fetchNotifications]);
 
   useEffect(() => {
     const channel = supabase
       .channel('realtime-notifications')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications' }, () => {
         fetchNotifications();
       })
       .subscribe();
@@ -54,7 +55,7 @@ export default function NotificationBell() {
     };
   }, [supabase, fetchNotifications]);
 
-  const markAsRead = async (notificationId: string) => {
+  const markAsRead = async (notificationId: number) => {
     const { error } = await supabase
       .from('notifications')
       .update({ read: true })

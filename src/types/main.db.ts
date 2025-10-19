@@ -3,7 +3,7 @@ export interface IProfile {
   email: string;
   full_name?: string;
   avatar_url?: string;
-  settings?: Record<string, any>;
+  settings?: Record<string, unknown>;
   created_at: Date;
   updated_at: Date;
 }
@@ -97,6 +97,7 @@ export interface INotification {
   read: boolean;
   created_at: Date;
   updated_at: Date;
+  url?: string;
 }
 
 export interface IChatSession {
@@ -157,7 +158,7 @@ export interface PresenceUser {
 
 export interface RealTimeEvent {
   type: string;
-  data: any;
+  data: unknown;
   timestamp: Date;
   user: IProfile;
 }

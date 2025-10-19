@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import type { ISessionMessage, ITab, IDraft } from '@/types/main.db';
 import AIResponse from '@/components/AIResponse';
 import { FiSend } from 'react-icons/fi';
+import useChromeAI from '@/hooks/useChromeAI';
 
 // Enhanced AI Chat Component
 const AIChat: React.FC<{
@@ -15,6 +16,7 @@ const AIChat: React.FC<{
   const [input, setInput] = useState('');
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const { session, error, prompt } = useChromeAI();
 
   useEffect(() => {
     // Generate suggested questions based on research context
@@ -28,11 +30,17 @@ const AIChat: React.FC<{
     setSuggestedQuestions(suggestions);
   }, [researchContext]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim() && !isLoading) {
       onSendMessage(input);
       setInput('');
+      if (prompt) {
+        const aiResponse = await prompt(input);
+        if (aiResponse) {
+          onSendMessage(aiResponse);
+        }
+      }
     }
   };
 
@@ -46,6 +54,11 @@ const AIChat: React.FC<{
 
   return (
     <div className="flex flex-col h-full bg-gray-50 rounded-lg">
+      {error && (
+        <div className="p-4 bg-red-100 text-red-700 border-b border-red-200">
+          <p>{error}</p>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => (
           <div key={message.id} className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}>

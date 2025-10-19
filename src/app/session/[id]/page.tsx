@@ -1,4 +1,9 @@
 'use client';
+declare global {
+  interface Window {
+    ai: any;
+  }
+}
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
@@ -123,7 +128,7 @@ const useAIService = () => {
 const useCollaboration = (sessionId: string, userId: string) => {
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
   const [isCollaborativeEditing, setIsCollaborativeEditing] = useState(false);
-  const [cursorPositions, setCursorPositions] = useState<Record<string, any>>({});
+  const [cursorPositions, setCursorPositions] = useState<Record<string, { x: number; y: number }>>({});
   const [editingStates, setEditingStates] = useState<Record<string, any>>({});
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const supabase = createClient();
@@ -174,7 +179,7 @@ const useCollaboration = (sessionId: string, userId: string) => {
     };
   }, [sessionId, userId, supabase]);
 
-  const broadcastCursorPosition = (position: any) => {
+  const broadcastCursorPosition = (position: { x: number; y: number }) => {
     const channel = supabase.channel(`session:${sessionId}`);
     channel.send({
       type: 'broadcast',
@@ -223,7 +228,8 @@ const AdvancedEditor: React.FC<{
   onlineUsers?: any[];
   currentUser?: IProfile | null;
   onAIAction?: (action: string, content: string) => Promise<string>;
-}> = ({ value, onChange, placeholder = "Start writing your research findings...", disabled = false, onlineUsers = [], currentUser, onAIAction }) => {
+  cursorPositions?: Record<string, { x: number; y: number }>;
+}> = ({ value, onChange, placeholder = "Start writing your research findings...", disabled = false, onlineUsers = [], currentUser, onAIAction, cursorPositions = {} }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const [isAILoading, setIsAILoading] = useState(false);
   const [showAITools, setShowAITools] = useState(false);
@@ -259,7 +265,8 @@ const AdvancedEditor: React.FC<{
       onChange(editorRef.current.innerHTML);
     } catch (error) {
       console.error('AI Action failed:', error);
-    } finally {
+    }
+ finally {
       setIsAILoading(false);
     }
   };
@@ -1019,7 +1026,8 @@ export default function AdvancedSessionPage() {
     isCollaborativeEditing, 
     setIsCollaborativeEditing,
     cursorPositions,
-    editingStates 
+    editingStates,
+    broadcastChatMessage
   } = useCollaboration(sessionId, userProfile?.id || '');
 
   const { 
@@ -1785,6 +1793,7 @@ finally {
                 onlineUsers={onlineUsers}
                 currentUser={userProfile}
                 onAIAction={handleAIAction}
+                cursorPositions={cursorPositions}
               />
               
               {sessionPermissions === 'viewer' && (

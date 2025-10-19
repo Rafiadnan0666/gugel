@@ -11,28 +11,51 @@ import {
   FiSun,
   FiChrome,
   FiGithub,
-  FiStar,
-  FiEye,
   FiLock,
-  FiCoffee,
   FiCode,
   FiCheck,
-  FiArrowRight,
-  FiExternalLink,
   FiMail,
   FiTwitter,
   FiLinkedin
 } from 'react-icons/fi';
+import { IoMdRocket } from 'react-icons/io';
 
-export default function GugelLanding() {
+interface FeatureCardProps {
+  feature: {
+    icon: React.ElementType;
+    title: string;
+    description: string;
+    color: string;
+  };
+  index: number;
+  activeFeature: number;
+  setActiveFeature: (index: number) => void;
+}
+
+const FeatureCard: React.FC<FeatureCardProps> = ({ feature, index, activeFeature, setActiveFeature }) => (
+  <div 
+    className={`p-6 rounded-xl border transition-all duration-300 hover:scale-105 cursor-pointer ${
+      activeFeature === index 
+        ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 shadow-lg' 
+        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md'
+    }`}
+    onMouseEnter={() => setActiveFeature(index)}
+  >
+    <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${feature.color} flex items-center justify-center mb-4`}>
+      <feature.icon className="text-white text-xl" />
+    </div>
+    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+      {feature.title}
+    </h3>
+    <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+      {feature.description}
+    </p>
+  </div>
+);
+
+export default function TabwiseSuitLanding() {
   const [darkMode, setDarkMode] = useState(false);
   const [activeFeature, setActiveFeature] = useState(0);
-
-  useEffect(() => {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setDarkMode(true);
-    }
-  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode);
@@ -113,27 +136,6 @@ export default function GugelLanding() {
     }
   ];
 
-  const FeatureCard = ({ feature, index }) => (
-    <div 
-      className={`p-6 rounded-xl border transition-all duration-300 hover:scale-105 cursor-pointer ${
-        activeFeature === index 
-          ? 'border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 shadow-lg' 
-          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:shadow-md'
-      }`}
-      onMouseEnter={() => setActiveFeature(index)}
-    >
-      <div className={`w-12 h-12 rounded-lg bg-gradient-to-r ${feature.color} flex items-center justify-center mb-4`}>
-        <feature.icon className="text-white text-xl" />
-      </div>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        {feature.title}
-      </h3>
-      <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-        {feature.description}
-      </p>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900 transition-colors duration-300">
       {/* Header */}
@@ -142,10 +144,10 @@ export default function GugelLanding() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-                <span className="text-white font-bold text-lg">G</span>
+                <IoMdRocket className="text-white text-xl" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                Gugel
+                Tabwise Suit
               </span>
             </div>
 
@@ -191,7 +193,7 @@ export default function GugelLanding() {
           </h1>
 
           <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
-            Gugel is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place.
+            Tabwise Suit is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
@@ -236,13 +238,13 @@ export default function GugelLanding() {
               A Better Way to Research
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Gugel provides the tools you need to streamline your research workflow.
+              Tabwise Suit provides the tools you need to streamline your research workflow.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <FeatureCard key={feature.title} feature={feature} index={index} />
+              <FeatureCard key={feature.title} feature={feature} index={index} activeFeature={activeFeature} setActiveFeature={setActiveFeature} />
             ))}
           </div>
         </div>
@@ -253,7 +255,7 @@ export default function GugelLanding() {
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-              How Gugel Works
+              How Tabwise Suit Works
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300">
               A simple process to supercharge your research.
@@ -313,7 +315,7 @@ export default function GugelLanding() {
             Get Started in Minutes
           </h2>
           <p className="text-xl mb-8 opacity-90">
-            Start your collaborative research journey with Gugel today.
+            Start your collaborative research journey with Tabwise Suit today.
           </p>
 
           <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8">
@@ -344,7 +346,7 @@ export default function GugelLanding() {
                   </li>
                   <li className="flex items-center gap-2">
                     <FiCheck className="text-green-300" />
-                    Enable "Developer mode"
+                    Enable &quot;Developer mode&quot;
                   </li>
                   <li className="flex items-center gap-2">
                     <FiCheck className="text-green-300" />
@@ -378,16 +380,16 @@ export default function GugelLanding() {
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4">
-              About Gugel
+              About Tabwise Suit
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300">
-              Gugel is an open-source collaborative research platform.
+              Tabwise Suit is an open-source collaborative research platform.
             </p>
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl p-8">
             <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">
-              Gugel was created to streamline the research process for teams. We believe that by providing a unified platform for collaboration, we can help researchers save time and produce better results.
+              Tabwise Suit was created to streamline the research process for teams. We believe that by providing a unified platform for collaboration, we can help researchers save time and produce better results.
             </p>
           </div>
         </div>
@@ -400,9 +402,9 @@ export default function GugelLanding() {
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl flex items-center justify-center">
-                  <span className="text-white font-bold">G</span>
+                  <IoMdRocket className="text-white" />
                 </div>
-                <span className="text-xl font-bold">Gugel</span>
+                <span className="text-xl font-bold">Tabwise Suit</span>
               </div>
               <p className="text-gray-400 text-sm">
                 Collaborative Research, Made Simple.
@@ -430,16 +432,16 @@ export default function GugelLanding() {
             <div>
               <h4 className="font-semibold mb-4">Connect</h4>
               <div className="flex gap-4">
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <a href="https://github.com/Rafiadnan0666/gugel" className="text-gray-400 hover:text-white transition-colors">
                   <FiGithub size={20} />
                 </a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <a href="https://github.com/Rafiadnan0666/gugel" className="text-gray-400 hover:text-white transition-.colors">
                   <FiTwitter size={20} />
                 </a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <a href="https://github.com/Rafiadnan0666/gugel" className="text-gray-400 hover:text-white transition-colors">
                   <FiLinkedin size={20} />
                 </a>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <a href="https/github.com/Rafiadnan0666/gugel" className="text-gray-400 hover:text-white transition-colors">
                   <FiMail size={20} />
                 </a>
               </div>
@@ -447,7 +449,7 @@ export default function GugelLanding() {
           </div>
 
           <div className="border-t border-gray-800 pt-8 text-center text-gray-400 text-sm">
-            <p>© 2025 Gugel. All rights reserved.</p>
+            <p>© 2025 Tabwise Suit. All rights reserved.</p>
           </div>
         </div>
       </footer>

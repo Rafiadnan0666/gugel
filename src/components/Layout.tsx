@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
-import Navbar from './Navbar';
+
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -9,9 +9,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
             <Sidebar isCollapsed={isSidebarCollapsed} setIsCollapsed={setIsSidebarCollapsed} />
             <div className={`flex-1 transition-all duration-300 ease-in-out ${
-                isSidebarCollapsed ? 'md:ml-2' : 'md:ml-10'
+                isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'
             }`}>
-                <main className="pt-0">
+                <main>
                     {children}
                 </main>
             </div>

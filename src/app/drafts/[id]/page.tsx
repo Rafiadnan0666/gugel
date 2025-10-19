@@ -18,6 +18,7 @@ interface IDraftWithResearchSession extends IDraft {
 interface IComment {
   id: string;
   content: string;
+  created_at?: string;
   profiles: {
     avatar_url: string;
     full_name: string;

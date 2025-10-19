@@ -126,7 +126,7 @@ export default function SettingsPage() {
                   { value: 'gpt-3.5', label: 'GPT-3.5' },
                   { value: 'gpt-4', label: 'GPT-4' },
                 ]}
-                onChange={(value) => handleSettingChange('ai_model', value)}
+                onChange={(value) => handleSettingChange('ai_model', value as 'gpt-3.5' | 'gpt-4')}
               />
               <Dropdown
                 label="Default PDF Template"
@@ -136,7 +136,7 @@ export default function SettingsPage() {
                   { value: 'academic', label: 'Academic' },
                   { value: 'research', label: 'Research Paper' },
                 ]}
-                onChange={(value) => handleSettingChange('default_pdf_template', value)}
+                onChange={(value) => handleSettingChange('default_pdf_template', value as 'simple' | 'academic' | 'research')}
               />
             </div>
 

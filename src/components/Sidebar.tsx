@@ -4,23 +4,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import { 
   FiHome, 
   FiUsers, 
-  FiMessageSquare, 
   FiBell, 
   FiPlusCircle, 
-  FiSearch, 
-  FiMenu, 
-  FiX, 
   FiChevronDown, 
   FiChevronUp, 
   FiLogOut,
-  FiUser,
   FiSettings,
-  FiActivity,
   FiBook,
   FiArchive,
-  FiDownload,
-  FiUploadCloud,
-  FiCoffee,
   FiMoon,
   FiSun,
   FiChevronsLeft,
@@ -28,35 +19,27 @@ import {
 } from "react-icons/fi";
 import { createClient } from '@/utils/supabase/client';
 import { IoMdRocket } from "react-icons/io";
-import { debounce } from 'lodash';
-import type { IProfile, IResearchSession, ITeam } from '@/types/main.db';
+import Image from "next/image";
+import { IProfile, IResearchSession, ITeam } from "@/types/main.db";
 
-interface INotification {
-  id: number;
-  user_id: string;
-  type: string;
-  payload: any;
-  read: boolean;
-  created_at: string;
-}
 
 const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: boolean) => void }> = ({ isCollapsed, setIsCollapsed }) => {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const [teams, setTeams] = useState<ITeam[]>([]);
   const [researchSessions, setResearchSessions] = useState<IResearchSession[]>([]);
-  const [isTeamsDropdownOpen, setIsTeamsDropdownOpen] = useState(false);
-  const [isSessionsDropdownOpen, setIsSessionsDropdownOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+
+
+
+
   const [user, setUser] = useState<IProfile | null>(null);
-  const [notifications, setNotifications] = useState<INotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [offlineData, setOfflineData] = useState<any>(null);
+
+
+
+
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
@@ -74,18 +57,6 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
-  const checkOfflineData = useCallback(() => {
-    const offlineDataStr = localStorage.getItem('tabwise_offline_data');
-    if (offlineDataStr) {
-      try {
-        const data = JSON.parse(offlineDataStr);
-        setOfflineData(data);
-      } catch (e) {
-        console.error('Error parsing offline data:', e);
-      }
-    }
-  }, []);
-
   const fetchResearchSessions = useCallback(async (userId: string) => {
     const { data } = await supabase
       .from('research_sessions')
@@ -96,20 +67,6 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
 
     if (data) {
       setResearchSessions(data);
-    }
-  }, [supabase]);
-
-  const fetchNotifications = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (data) {
-      setNotifications(data);
-      setUnreadCount(data.filter(n => !n.read).length);
     }
   }, [supabase]);
 
@@ -144,131 +101,32 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
         .select('teams(*)')
         .eq('user_id', authUser.id);
       
-      const allTeams: ITeam[] = memberTeams?.map((mt: { teams: ITeam }) => mt.teams).filter(Boolean) || [];
+      const allTeams: ITeam[] = memberTeams?.map((mt: any) => mt.teams).filter(Boolean) as ITeam[] || [];
       setTeams(allTeams);
 
       await fetchResearchSessions(authUser.id);
-      await fetchNotifications(authUser.id);
-      checkOfflineData();
     };
 
     fetchData();
-  }, [supabase, router, fetchResearchSessions, fetchNotifications, checkOfflineData]);
+  }, [supabase, router, fetchResearchSessions]);
 
-  const syncOfflineData = useCallback(async () => {
-    if (!offlineData || !user) return;
-    
-    setIsSyncing(true);
-    try {
-      localStorage.removeItem('tabwise_offline_data');
-      setOfflineData(null);
-      
-      const { error } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: user.id,
-          type: 'sync',
-          payload: { message: 'Offline data synced successfully' },
-          read: false
-        });
-      
-      if (!error) {
-        await fetchNotifications(user.id);
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [offlineData, user, supabase, fetchNotifications]);
 
-  const handleSearch = useCallback(debounce(async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    try {
-      const { data: posts } = await supabase
-        .from('posts')
-        .select('id, title, slug')
-        .ilike('title', `%${query}%`)
-        .eq('visibility', 'public')
-        .limit(5);
-
-      const { data: teams } = await supabase
-        .from('teams')
-        .select('id, name')
-        .ilike('name', `%${query}%`)
-        .eq('visibility', 'public')
-        .limit(5);
-
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('id, name, full_name')
-        .or(`name.ilike.%${query}%,full_name.ilike.%${query}%`)
-        .limit(5);
-
-      const { data: sessions } = await supabase
-        .from('research_sessions')
-        .select('id, title')
-        .ilike('title', `%${query}%`)
-        .limit(5);
-
-      setSearchResults([
-        ...(posts?.map(p => ({ ...p, type: 'post' })) || []),
-        ...(teams?.map(t => ({ ...t, type: 'team' })) || []),
-        ...(users?.map(u => ({ ...u, type: 'user' })) || []),
-        ...(sessions?.map(s => ({ ...s, type: 'research_session' })) || [])
-      ]);
-    } catch (error) {
-      console.error('Search error:', error);
-      setSearchResults([]);
-    }
-  }, 300), [supabase]);
-
-  useEffect(() => {
-    handleSearch(searchQuery);
-    return () => handleSearch.cancel();
-  }, [searchQuery, handleSearch]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/sign-in');
   };
 
-  const navigateTo = (path: string) => {
-    router.push(path);
-    setIsMobileMenuOpen(false);
-    setSearchResults([]);
-    setSearchQuery("");
-  };
 
-  const handleSearchItemClick = (item: any) => {
-    switch (item.type) {
-      case 'post':
-        navigateTo(`/post/${item.slug}`);
-        break;
-      case 'team':
-        navigateTo(`/team/${item.id}`);
-        break;
-      case 'user':
-        navigateTo(`/user/${item.id}`);
-        break;
-      case 'research_session':
-        navigateTo(`/session/${item.id}`);
-        break;
-      default:
-        break;
-    }
-  };
+
+
 
   const NavItem: React.FC<{ href: string; icon: React.ReactNode; label: string; exact?: boolean }> = ({ href, icon, label, exact }) => {
     const isActive = exact ? pathname === href : pathname.startsWith(href);
     return (
       <li>
         <button
-          onClick={() => navigateTo(href)}
+          onClick={() => router.push(href)}
           className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 ${
             isActive
               ? 'bg-orange-50 dark:bg-gray-800 text-orange-500 dark:text-orange-400'
@@ -282,7 +140,7 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
     );
   };
 
-  const Dropdown: React.FC<{ title: string; icon: React.ReactNode; items: any[]; pathPrefix: string; nameKey: string; idKey?: string; createPath?: string }> = ({ title, icon, items, pathPrefix, nameKey, idKey = 'id', createPath }) => {
+  const Dropdown: React.FC<{ title: string; icon: React.ReactNode; items: (ITeam | IResearchSession)[]; pathPrefix: string; nameKey: string; idKey?: string; createPath?: string }> = ({ title, icon, items, pathPrefix, nameKey, idKey = 'id', createPath }) => {
     const [isOpen, setIsOpen] = useState(false);
     return (
       <li>
@@ -306,7 +164,7 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
             {items.map((item) => (
               <li key={item[idKey]}>
                 <button
-                  onClick={() => navigateTo(`${pathPrefix}/${item[idKey]}`)}
+                  onClick={() => router.push(`${pathPrefix}/${item[idKey]}`)}
                   className={`w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-sm ${
                     pathname === `${pathPrefix}/${item[idKey]}`
                       ? 'text-orange-500 dark:text-orange-400 font-medium'
@@ -320,7 +178,7 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
             {createPath && (
               <li>
                 <button
-                  onClick={() => navigateTo(createPath)}
+                  onClick={() => router.push(createPath)}
                   className="w-full flex items-center p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 text-sm"
                 >
                   <FiPlusCircle className="mr-2 text-sm" />
@@ -353,7 +211,7 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
             {!isCollapsed && (
               <div 
                 className="flex items-center cursor-pointer"
-                onClick={() => navigateTo('/')}
+                onClick={() => router.push('/')}
               >
                 <IoMdRocket className="text-orange-500 text-2xl" />
                 <span className="ml-2 font-bold text-xl dark:text-white">Tabwise</span>
@@ -381,15 +239,14 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
                 isCollapsed ? 'justify-center' : ''
               }`}>
                 <div 
-                  className="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center text-white font-medium cursor-pointer"
-                  onClick={() => navigateTo('/profile')}
+                  onClick={() => router.push('/profile')}
                 >
-                  <img className="w-8 h-8 rounded-full" src={user.avatar_url || '/default-avatar.png'} alt="" />
+                  <Image className="w-8 h-8 rounded-full" src={user.avatar_url || '/default-avatar.png'} alt="" width={32} height={32} />
                 </div>
                 {!isCollapsed && (
                   <div 
                     className="ml-3 flex-1 min-w-0 cursor-pointer"
-                    onClick={() => navigateTo('/profile')}
+                    onClick={() => router.push('/profile')}
                   >
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {user.full_name || user.email}
