@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { FiX, FiSave } from 'react-icons/fi';
-import AdvancedEditor from '@/components/editor/AdvancedEditor';
+import { ProEditor } from '@/components/editor/ProEditor';
 
 // Full Screen Editor Modal
 const FullScreenEditor: React.FC<{
@@ -43,11 +43,11 @@ const FullScreenEditor: React.FC<{
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden">
-        <AdvancedEditor
-          value={value}
+        <ProEditor
+          content={value}
           onChange={onChange}
-          onAIAction={onAIAction}
-          placeholder="Start writing your research draft..."
+
+
         />
       </div>
     </div>

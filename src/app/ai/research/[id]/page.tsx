@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
@@ -28,13 +28,7 @@ export default function ResearchPage() {
 
   const { aiStatus, chatWithAI, generateSummary, rewriteContent } = useAIService();
 
-  useEffect(() => {
-    if (sessionId) {
-      loadSession();
-    }
-  }, [sessionId]);
-
-  const loadSession = async () => {
+  const loadSession = useCallback(async () => {
     try {
       const { data: sessionData, error: sessionError } = await supabase
         .from('research_sessions')
@@ -63,7 +57,13 @@ export default function ResearchPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId, supabase]);
+
+  useEffect(() => {
+    if (sessionId) {
+      loadSession();
+    }
+  }, [sessionId, loadSession]);
 
   const saveDraft = async () => {
     if (!sessionId) return;

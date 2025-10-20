@@ -201,7 +201,7 @@ const Sidebar: React.FC<{ isCollapsed: boolean; setIsCollapsed: (isCollapsed: bo
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-30 h-screen bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out ${
+        className={`fixed top-0 left-0 z-30 h-screen mr-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out ${
           isCollapsed ? 'w-20' : 'w-64'
         }`}
         aria-label="Sidebar"

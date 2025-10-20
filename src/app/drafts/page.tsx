@@ -31,26 +31,25 @@ export default function DraftListPage() {
   const [hasMoreDrafts, setHasMoreDrafts] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    loadSessions(sessionPage);
-  }, [sessionPage]);
+    const loadSessions = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-  const loadSessions = async (page = 1) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+      const { data } = await supabase
+        .from('research_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .range((sessionPage - 1) * 10, sessionPage * 10 - 1);
 
-    const { data } = await supabase
-      .from('research_sessions')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .range((page - 1) * 10, page * 10 - 1);
-
-    if (data) {
-      setSessions(prev => (page === 1 ? data : [...prev, ...data]));
-      setHasMoreSessions(data.length === 10);
+      if (data) {
+        setSessions(prev => (sessionPage === 1 ? data : [...prev, ...data]));
+        setHasMoreSessions(data.length === 10);
+      }
+      setLoading(false);
     }
-    setLoading(false);
-  };
+    loadSessions();
+  }, [sessionPage, supabase]);
 
   const loadDrafts = async (sessionId: string, page = 1) => {
     const { data } = await supabase
@@ -96,7 +95,7 @@ export default function DraftListPage() {
       } else {
         await supabase.from('research_sessions').insert({ title: content, user_id: user.id });
       }
-      loadSessions();
+      setSessionPage(1);
     } else if (type === 'draft') {
       if (item?.id) {
         await supabase.from('drafts').update({ content, version: (item.version || 0) + 1 }).eq('id', item.id);
@@ -124,7 +123,7 @@ export default function DraftListPage() {
   const deleteItem = async (type: 'session' | 'draft', id: string, sessionId?: string) => {
     if (!confirm('Are you sure?')) return;
     await supabase.from(type === 'session' ? 'research_sessions' : 'drafts').delete().eq('id', id);
-    if (type === 'session') loadSessions();
+    if (type === 'session') setSessionPage(1);
     else if (sessionId) loadDrafts(sessionId);
   };
 

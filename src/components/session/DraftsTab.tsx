@@ -2,7 +2,7 @@
 
 import { FiZap, FiSave, FiMaximize, FiEye, FiEdit2 } from 'react-icons/fi';
 import type { IDraft, IProfile } from '@/types/main.db';
-import AdvancedEditor from '@/components/editor/AdvancedEditor';
+import { ProEditor } from '@/components/editor/ProEditor';
 
 interface DraftsTabProps {
   tabs: any[]; // Simplified for now
@@ -56,14 +56,14 @@ export default function DraftsTab({
           </div>
         </div>
         
-        <AdvancedEditor
-          value={currentDraft}
+        <ProEditor
+          content={currentDraft}
           onChange={onSetCurrentDraft}
-          placeholder="Start writing your research findings... Use AI tools to enhance your writing."
-          disabled={sessionPermissions === 'viewer'}
-          onlineUsers={onlineUsers}
-          currentUser={userProfile}
-          onAIAction={onAIAction}
+
+
+
+
+
         />
         
         {sessionPermissions === 'viewer' && (

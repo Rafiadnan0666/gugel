@@ -7,6 +7,14 @@ import { FiSend } from 'react-icons/fi';
 import useChromeAI from '@/hooks/useChromeAI';
 
 // Enhanced AI Chat Component
+const suggestions = [
+  "Summarize my research findings",
+  "Suggest a structure for my draft",
+  "What are the key themes in my sources?",
+  "Help me write an introduction",
+  "Find connections between my tabs"
+];
+
 const AIChat: React.FC<{
   messages: ISessionMessage[];
   onSendMessage: (content: string) => void;
@@ -14,21 +22,9 @@ const AIChat: React.FC<{
   researchContext: { tabs: ITab[]; drafts: IDraft[] };
 }> = ({ messages, onSendMessage, isLoading, researchContext }) => {
   const [input, setInput] = useState('');
-  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(suggestions);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { session, error, prompt } = useChromeAI();
-
-  useEffect(() => {
-    // Generate suggested questions based on research context
-    const suggestions = [
-      "Summarize my research findings",
-      "Suggest a structure for my draft",
-      "What are the key themes in my sources?",
-      "Help me write an introduction",
-      "Find connections between my tabs"
-    ];
-    setSuggestedQuestions(suggestions);
-  }, [researchContext]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

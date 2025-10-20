@@ -148,11 +148,7 @@ export default function Dashboard() {
       ]);
 
       const sessionsData = sessionsResponse.data || [];
-<<<<<<< HEAD
-      const teamsData = teamsResponse.data?.map((t) => t.teams).filter(Boolean).flat() as ITeam[] || [];
-=======
       const teamsData = teamsResponse.data?.flatMap(t => t.teams).filter(Boolean) as ITeam[] || [];
->>>>>>> 62894e5feb2d5b345c83a06860f12b138cf119f0
       const tabsData = tabsResponse.data || [];
       const draftsData = draftsResponse.data || [];
       const recentDraftsData = recentDraftsResponse.data || [];
@@ -470,7 +466,7 @@ export default function Dashboard() {
               </div>
             </div>
             <p className="text-gray-600 text-lg">
-              Welcome back{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}! Here's your research overview.
+              Welcome back{userProfile?.full_name ? `, ${userProfile.full_name}` : ''}! Here&apos;s your research overview.
             </p>
           </div>
           <div className="flex gap-3">

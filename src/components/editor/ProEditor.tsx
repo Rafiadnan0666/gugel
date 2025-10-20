@@ -1,7 +1,8 @@
 
-import { useEditor, EditorContent, BubbleMenu, FloatingMenu } from '@tiptap/react';
-import { BubbleMenu as BubbleMenuExtension } from '@tiptap/extension-bubble-menu';
-import { FloatingMenu as FloatingMenuExtension } from '@tiptap/extension-floating-menu';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu, FloatingMenu } from '@tiptap/react/menus';
+import BubbleMenuExtension from '@tiptap/extension-bubble-menu';
+import FloatingMenuExtension from '@tiptap/extension-floating-menu';
 import StarterKit from '@tiptap/starter-kit';
 import { FC } from 'react';
 import styled from 'styled-components';
@@ -18,7 +19,7 @@ interface ProEditorProps {
 
 export const ProEditor: FC<ProEditorProps> = ({ content, onChange }) => {
   const editor = useEditor({
-    extensions: [StarterKit, BubbleMenuExtension, FloatingMenuExtension],
+    extensions: [StarterKit, BubbleMenuExtension.configure({}), FloatingMenuExtension.configure({})],
     content,
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -32,7 +33,7 @@ export const ProEditor: FC<ProEditorProps> = ({ content, onChange }) => {
 
   return (
     <EditorContainer>
-      <FloatingMenu editor={editor} tippyOptions={{ duration: 100 }}>
+      <FloatingMenu editor={editor}>
         <div className="floating-menu">
           <button
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
@@ -54,7 +55,7 @@ export const ProEditor: FC<ProEditorProps> = ({ content, onChange }) => {
           </button>
         </div>
       </FloatingMenu>
-      <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
+      <BubbleMenu editor={editor}>
         <div className="bubble-menu">
           <button
             onClick={() => editor.chain().focus().toggleBold().run()}
