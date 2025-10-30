@@ -13,6 +13,37 @@ Gugel is a collaborative research platform that helps you and your team organize
 - **Dark/Light Mode:** Choose your preferred theme, which automatically syncs with your system preference.
 - **Export Your Work:** Export your research sessions and drafts to various formats for easy sharing and archiving.
 
+## Pages and Functionality
+
+### Landing Page
+
+The landing page provides a brief overview of Gugel's features and benefits. It serves as the entry point for new and returning users, with clear calls-to-action to sign in or sign up.
+
+### Authentication
+
+-   **Sign In (`/sign-in`):** Allows existing users to log in to their accounts.
+-   **Sign Up (`/sign-up`):** Enables new users to create an account.
+-   **Reset Password (`/reset-password`):** Provides a way for users to reset their password if they have forgotten it.
+-   **Update Password (`/update-password`):** Allows logged-in users to change their password.
+
+### Core Application
+
+-   **Dashboard (`/dashboard`):** The main hub for users after logging in. It displays recent activity, an overview of research sessions, and quick access to drafts.
+-   **AI Research (`/ai/research/[id]`):** A powerful feature where users can leverage AI to analyze and get insights from their research materials within a specific session.
+-   **Drafts (`/drafts`):** A list of all research drafts created by the user.
+-   **Individual Draft (`/drafts/[id]`):** A collaborative editor for writing and editing a specific draft in real-time with team members.
+-   **Notifications (`/notifications`):** Displays a feed of notifications related to research sessions, mentions, and other activities.
+-   **Profile (`/profile`):** Allows users to view and manage their personal information.
+-   **Research (`/research`):** A page to view and manage all research sessions.
+-   **Collaboration Session (`/session/[id]`):** The main workspace for a research session. It includes features like AI chat, content management, and collaboration tools.
+-   **Settings (`/settings`):** Users can customize their application preferences, such as theme and notification settings.
+
+### Teams
+
+-   **Create Team (`/team/create`):** Allows users to create a new team and invite members.
+-   **Team Dashboard (`/team/[id]`):** Provides an overview of a specific team, including members, research sessions, and activity.
+-   **Team Research (`/team/research/[idr]`):** A dedicated space for teams to collaborate on research projects.
+
 ## Tech Stack
 
 - **Framework:** [Next.js](https://nextjs.org/) (React)
