@@ -325,7 +325,7 @@ export default function TabwiseSuitLanding() {
                 <ol className="space-y-3 text-sm">
                   <li className="flex items-center gap-2">
                     <FiCheck className="text-green-300" />
-                    <code>git clone https://github.com/Rafiadnan0666/gugel.git</code>
+                    <code>git clone https://github.com/Rafiadnan0666/tabwise.git</code>
                   </li>
                   <li className="flex items-center gap-2">
                     <FiCheck className="text-green-300" />

@@ -1,6 +1,6 @@
-# Gugel — Collaborative Research, Made Simple.
+# Tabwise — Collaborative Research, Made Simple.
 
-Gugel is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place.
+Tabwise is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place.
 
 ## Key Features
 
@@ -17,7 +17,7 @@ Gugel is a collaborative research platform that helps you and your team organize
 
 ### Landing Page
 
-The landing page provides a brief overview of Gugel's features and benefits. It serves as the entry point for new and returning users, with clear calls-to-action to sign in or sign up.
+The landing page provides a brief overview of Tabwise's features and benefits. It serves as the entry point for new and returning users, with clear calls-to-action to sign in or sign up.
 
 ### Authentication
 
@@ -65,8 +65,8 @@ The landing page provides a brief overview of Gugel's features and benefits. It 
 1.  **Clone the repository:**
 
     ```bash
-    git clone https://github.com/your-username/gugel.git
-    cd gugel
+    git clone https://github.com/your-username/gugel.git tabwise
+    cd tabwise
     ```
 
 2.  **Install dependencies:**
@@ -94,7 +94,7 @@ The landing page provides a brief overview of Gugel's features and benefits. It 
 
 ## Browser Extension
 
-Gugel also comes with a browser extension to make it even easier to collect your tabs and resources.
+Tabwise also comes with a browser extension to make it even easier to collect your tabs and resources.
 
 ### To install the extension:
 

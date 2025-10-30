@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gugel-cache-v1';
+const CACHE_NAME = 'tabwise-cache-v1';
 const urlsToCache = [
   '/',
   '/app/globals.css',
