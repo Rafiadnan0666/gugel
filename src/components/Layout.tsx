@@ -11,10 +11,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div className={`flex-1 transition-all duration-300 ease-in-out ${
         isSidebarCollapsed ? 'md:ml-5' : 'md:ml-10'
       }`}>
-        <main role="main" aria-label="Main content">
+        <main 
+          id="main-content" 
+          role="main" 
+          aria-label="Main content"
+          tabIndex={-1}
+        >
           {children}
         </main>
-      </div>
+      
+      {/* Skip to main content for keyboard navigation */}
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:outline-none"
+        tabIndex={0}
+      >
+        Skip to main content
+      </a>
+    </div>
       
       {/* Skip to main content for keyboard navigation */}
       <a 
