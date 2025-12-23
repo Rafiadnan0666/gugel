@@ -1213,15 +1213,202 @@ const TabSummary: React.FC<{
   );
 };
 
+// Plagiarism Report Modal
+const PlagiarismReportModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  report: any;
+}> = ({ isOpen, onClose, report }) => {
+  if (!report) return null;
+
+  const getScoreColor = (score: number) => {
+    if (score >= 85) return 'text-green-600 bg-green-50';
+    if (score >= 70) return 'text-yellow-600 bg-yellow-50';
+    if (score >= 50) return 'text-orange-600 bg-orange-50';
+    return 'text-red-600 bg-red-50';
+  };
+
+  const getScoreLabel = (score: number) => {
+    if (score >= 85) return 'Original';
+    if (score >= 70) return 'Good';
+    if (score >= 50) return 'Moderate';
+    return 'Low Originality';
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title="Plagiarism Analysis Report" size="xl">
+      <div className="space-y-6">
+        {/* Originality Score */}
+        <div className="text-center">
+          <div className={`inline-flex items-center justify-center w-32 h-32 rounded-full text-4xl font-bold ${getScoreColor(report.originality_score)}`}>
+            {report.originality_score}%
+          </div>
+          <h3 className={`mt-4 text-xl font-semibold ${getScoreColor(report.originality_score)}`}>
+            {getScoreLabel(report.originality_score)}
+          </h3>
+          <p className="text-gray-600 mt-2">
+            Originality Score ({report.analysis.total_words} words analyzed)
+          </p>
+        </div>
+
+        {/* Analysis Details */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-gray-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-2">Content Analysis</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Total Words:</span>
+                <span className="font-medium">{report.analysis.total_words}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Unique Phrases:</span>
+                <span className="font-medium">{report.analysis.unique_phrases}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Common Phrases:</span>
+                <span className="font-medium text-yellow-600">{report.analysis.common_phrases.length}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-blue-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-2">Similarity Detection</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Matches Found:</span>
+                <span className="font-medium">{report.similarity_matches.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Highest Match:</span>
+                <span className="font-medium">
+                  {report.similarity_matches.length > 0 
+                    ? Math.max(...report.similarity_matches.map(m => m.similarity_percentage)).toFixed(1) + '%'
+                    : 'None'
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Avg Match:</span>
+                <span className="font-medium">
+                  {report.similarity_matches.length > 0
+                    ? (report.similarity_matches.reduce((sum: number, m: any) => sum + m.similarity_percentage, 0) / report.similarity_matches.length).toFixed(1) + '%'
+                    : 'None'
+                  }
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-purple-50 rounded-lg p-4">
+            <h4 className="font-semibold text-gray-900 mb-2">Assessment</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span>Status:</span>
+                <span className={`font-medium capitalize ${report.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                  {report.status}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Risk Level:</span>
+                <span className={`font-medium ${getScoreColor(report.originality_score)}`}>
+                  {getScoreLabel(report.originality_score)}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Common Phrases */}
+        {report.analysis.common_phrases.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-3">Common Academic Phrases Found</h4>
+            <div className="flex flex-wrap gap-2">
+              {report.analysis.common_phrases.map((phrase: string, index: number) => (
+                <span key={index} className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm">
+                  {phrase}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Similarity Matches */}
+        {report.similarity_matches.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-3">Potential Similarity Matches</h4>
+            <div className="space-y-3">
+              {report.similarity_matches.slice(0, 5).map((match: any, index: number) => (
+                <div key={index} className="border border-red-200 rounded-lg p-3 bg-red-50">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-medium text-red-900">{match.source}</span>
+                    <span className="bg-red-600 text-white px-2 py-1 rounded text-sm">
+                      {match.similarity_percentage}% similarity
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-700 mb-2">{match.matched_text}</p>
+                  {match.url && (
+                    <a 
+                      href={match.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 text-sm flex items-center"
+                    >
+                      <FiExternalLink className="w-3 h-3 mr-1" />
+                      View Source
+                    </a>
+                  )}
+                </div>
+              ))}
+              {report.similarity_matches.length > 5 && (
+                <p className="text-sm text-gray-600 text-center">
+                  ... and {report.similarity_matches.length - 5} more matches
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Recommendations */}
+        {report.analysis.recommendations.length > 0 && (
+          <div>
+            <h4 className="font-semibold text-gray-900 mb-3">Recommendations</h4>
+            <div className="space-y-2">
+              {report.analysis.recommendations.map((rec: string, index: number) => (
+                <div key={index} className="flex items-start space-x-2">
+                  <FiCheck className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-gray-700">{rec}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end space-x-3 pt-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Close Report
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // Enhanced Download Options Modal
 const DownloadOptionsModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
   onDownload: (template: string, includeSources: boolean) => void;
+  onAdvancedDownload: (options: any) => void;
   currentTemplate: string;
-}> = ({ isOpen, onClose, onDownload, currentTemplate }) => {
+}> = ({ isOpen, onClose, onDownload, onAdvancedDownload, currentTemplate }) => {
   const [selectedTemplate, setSelectedTemplate] = useState(currentTemplate);
   const [includeSources, setIncludeSources] = useState(true);
+  const [plagiarismCheck, setPlagiarismCheck] = useState(false);
+  const [batchProcessing, setBatchProcessing] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const templates = {
     simple: {
@@ -1238,11 +1425,25 @@ const DownloadOptionsModal: React.FC<{
       name: 'Research Paper',
       description: 'Comprehensive research paper with sources and methodology',
       features: ['Full research structure', 'Methodology section', 'Source integration', 'Comprehensive layout']
+    },
+    comprehensive: {
+      name: 'Comprehensive Report',
+      description: 'Advanced multi-section report with full analysis',
+      features: ['Executive summary', 'Detailed analysis', 'AI-enhanced sections', 'Full references']
     }
   };
 
   const handleDownload = () => {
-    onDownload(selectedTemplate, includeSources);
+    if (showAdvanced) {
+      onAdvancedDownload({
+        template: selectedTemplate,
+        includeSources,
+        plagiarismCheck,
+        batchProcessing
+      });
+    } else {
+      onDownload(selectedTemplate, includeSources);
+    }
     onClose();
   };
 
@@ -1302,6 +1503,55 @@ const DownloadOptionsModal: React.FC<{
           </label>
         </div>
 
+        {/* Advanced Options Toggle */}
+        <div className="border-t pt-4">
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center justify-between w-full text-left p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <span className="font-medium text-gray-900">Advanced Options</span>
+            <FiChevronDown className={`w-5 h-5 text-gray-600 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {showAdvanced && (
+            <div className="mt-3 space-y-4">
+              {/* Batch Processing */}
+              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">AI Batch Processing</span>
+                  <p className="text-sm text-gray-600">Process each section with AI for enhanced quality</p>
+                </div>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={batchProcessing}
+                    onChange={(e) => setBatchProcessing(e.target.checked)}
+                    className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="ml-2 text-sm font-medium text-blue-900">Enable</span>
+                </label>
+              </div>
+
+              {/* Plagiarism Check */}
+              <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                <div>
+                  <span className="font-medium text-gray-900">Plagiarism Detection</span>
+                  <p className="text-sm text-gray-600">Comprehensive originality analysis with similarity checking</p>
+                </div>
+                <label className="flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={plagiarismCheck}
+                    onChange={(e) => setPlagiarismCheck(e.target.checked)}
+                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  />
+                  <span className="ml-2 text-sm font-medium text-purple-900">Enable</span>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex justify-end space-x-3 pt-4">
           <button
             onClick={onClose}
@@ -1314,7 +1564,7 @@ const DownloadOptionsModal: React.FC<{
             className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center transition-colors"
           >
             <FiDownload className="w-4 h-4 mr-2" />
-            Export as PDF
+            {showAdvanced ? 'Advanced Export' : 'Export as PDF'}
           </button>
         </div>
       </div>
@@ -1343,6 +1593,7 @@ export default function AdvancedSessionPage() {
   const [chatMessages, setChatMessages] = useState<ISessionMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [modal, setModal] = useState<{ type: string; data?: any }>({ type: '' });
+  const [plagiarismReport, setPlagiarismReport] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<IProfile | null>(null);
   const [sessionPermissions, setSessionPermissions] = useState<'owner' | 'editor' | 'viewer'>('viewer');
   const [showTabModal, setShowTabModal] = useState(false);
@@ -1354,6 +1605,7 @@ export default function AdvancedSessionPage() {
   const [showAIDraftModal, setShowAIDraftModal] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [pdfTemplate, setPdfTemplate] = useState('simple');
+  const [isCheckingPlagiarism, setIsCheckingPlagiarism] = useState(false);
 
   // Enhanced Hooks
   const { 
@@ -1375,33 +1627,66 @@ export default function AdvancedSessionPage() {
     analyzeURLContent
   } = useAIService();
 
-  // Enhanced AI Analysis for URLs
+  // Enhanced AI Analysis for URLs with Advanced Web Scraping
   const analyzeURLWithAI = async (url: string) => {
     try {
-      // First try to fetch the content
-      const response = await fetch('/api/proxy?url=' + encodeURIComponent(url));
-      if (!response.ok) {
-        throw new Error('Failed to fetch URL content');
+      // Use our advanced web scraper
+      const scrapingResponse = await fetch('/api/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          urls: url,
+          task: 'scrape-single'
+        })
+      });
+
+      if (!scrapingResponse.ok) {
+        throw new Error('Failed to scrape URL');
       }
+
+      const scrapingResult = await scrapingResponse.json();
       
-      const html = await response.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
+      if (!scrapingResult.result.success) {
+        throw new Error(scrapingResult.result.errors?.join(', ') || 'Scraping failed');
+      }
+
+      const scrapedData = scrapingResult.result.content;
       
-      // Extract title and content
-      const title = doc.querySelector('title')?.textContent || 'Untitled';
-      const content = doc.body.textContent?.substring(0, 2000) || 'No content available';
-      
-      // Use AI to analyze and summarize
-      const aiAnalysis = await analyzeURLContent(url);
+      // Use AI to enhance the scraped content
+      const aiPrompt = `Analyze and enhance this scraped web content. Provide a comprehensive summary and extract key insights:
+
+URL: ${url}
+Title: ${scrapedData.title}
+Content Preview: ${scrapedData.content.substring(0, 1500)}
+
+SEO Score: ${scrapedData.summary.seoScore}/100
+Content Quality: ${scrapedData.summary.contentQuality}
+Word Count: ${scrapedData.metadata.wordCount}
+Author: ${scrapedData.metadata.author || 'Unknown'}
+
+Please provide:
+1. A comprehensive summary
+2. Key points and insights
+3. Relevance to research
+4. Notable quotes or statistics
+5. Source credibility assessment
+
+Respond with clean, structured text.`;
+
+      const aiAnalysis = await chatWithAI(`Analyze this content: ${aiPrompt}`, { tabs, drafts });
       
       return {
-        title: title,
-        content: aiAnalysis || content
+        title: scrapedData.title,
+        content: aiAnalysis || scrapedData.content,
+        metadata: {
+          ...scrapedData.metadata,
+          scrapingReport: scrapedData,
+          aiAnalysis: aiAnalysis
+        }
       };
     } catch (error) {
-      console.error('URL analysis failed:', error);
-      // Fallback to direct AI analysis
+      console.error('Enhanced URL analysis failed:', error);
+      // Fallback to basic analysis
       try {
         const aiAnalysis = await analyzeURLContent(url);
         return {
@@ -1409,7 +1694,7 @@ export default function AdvancedSessionPage() {
           content: aiAnalysis
         };
       } catch (aiError) {
-        console.error('AI analysis also failed:', aiError);
+        console.error('Fallback analysis also failed:', aiError);
         throw new Error('Failed to analyze URL content');
       }
     }
@@ -1694,25 +1979,136 @@ export default function AdvancedSessionPage() {
     }
   };
 
-  const handleExport = async (template: string, includeSources: boolean = true) => {
+  const handleAdvancedExport = async (options: {
+    template: string;
+    includeSources: boolean;
+    plagiarismCheck: boolean;
+    batchProcessing: boolean;
+  }) => {
     if (!session) return;
 
     setShowDownloadModal(false);
+    const { template, includeSources, plagiarismCheck, batchProcessing } = options;
 
-    let tabsToExport: any[] = [];
-    if (includeSources && (template === 'academic' || template === 'research')) {
-      tabsToExport = tabs;
+    // Show loading state
+    setModal({ type: 'loading', data: { message: 'Processing advanced export...' } });
+
+    try {
+      // Prepare sections for batch processing
+      let sections = [];
+      if (batchProcessing) {
+        // Split content into logical sections
+        const contentParagraphs = currentDraft.split(/\n\n+/);
+        const sectionTitles = ['Introduction', 'Main Analysis', 'Key Findings', 'Conclusion'];
+        const paragraphsPerSection = Math.ceil(contentParagraphs.length / sectionTitles.length);
+        
+        sectionTitles.forEach((title, index) => {
+          const startIdx = index * paragraphsPerSection;
+          const endIdx = Math.min(startIdx + paragraphsPerSection, contentParagraphs.length);
+          const sectionContent = contentParagraphs.slice(startIdx, endIdx).join('\n\n');
+          
+          if (sectionContent.trim()) {
+            sections.push({ title, content: sectionContent });
+          }
+        });
+      }
+
+      // Prepare sources
+      const sources = includeSources ? tabs.map(tab => ({
+        title: tab.title,
+        url: tab.url,
+        content: tab.content?.substring(0, 500) || '',
+        created_at: tab.created_at
+      })) : [];
+
+      // Call advanced export API
+      const exportResponse = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: currentDraft,
+          template,
+          includeSources,
+          sources,
+          batchProcessing,
+          plagiarismCheck,
+          sections
+        })
+      });
+
+      if (!exportResponse.ok) {
+        throw new Error('Export failed');
+      }
+
+      const exportResult = await exportResponse.json();
+
+      // Show comprehensive results
+      setModal({ 
+        type: 'export-success', 
+        data: {
+          pdf_url: exportResult.pdf_url,
+          metadata: exportResult.metadata,
+          analysis: exportResult.analysis
+        }
+      });
+
+      // If plagiarism check was performed, show detailed results
+      if (plagiarismCheck && exportResult.analysis.plagiarism) {
+        setTimeout(() => {
+          setModal({
+            type: 'plagiarism-report',
+            data: exportResult.analysis.plagiarism
+          });
+        }, 2000);
+      }
+
+    } catch (error) {
+      console.error('Advanced export failed:', error);
+      setModal({ 
+        type: 'error', 
+        data: { message: 'Failed to process advanced export. Please try again.' }
+      });
+    }
+  };
+
+  const handleExport = async (template: string, includeSources: boolean = true) => {
+    handleAdvancedExport({
+      template,
+      includeSources,
+      plagiarismCheck: false,
+      batchProcessing: false
+    });
+  };
+
+  const checkPlagiarism = async () => {
+    if (!currentDraft.trim()) {
+      setModal({ type: 'error', data: { message: 'No content to check for plagiarism.' } });
+      return;
     }
 
-    const draftToExport = {
-      content: currentDraft,
-      version: draftVersion,
-      research_sessions: {
-        title: session?.title || 'Research'
-      }
-    };
+    setIsCheckingPlagiarism(true);
+    setModal({ type: 'loading', data: { message: 'Analyzing content for originality...' } });
 
-    exportToPDF(template, draftToExport as any, tabsToExport);
+    try {
+      const response = await fetch('/api/plagiarism', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: currentDraft })
+      });
+
+      if (!response.ok) {
+        throw new Error('Plagiarism check failed');
+      }
+
+      const result = await response.json();
+      setModal({ type: 'plagiarism-report', data: result.result });
+      
+    } catch (error) {
+      console.error('Plagiarism check failed:', error);
+      setModal({ type: 'error', data: { message: 'Failed to check plagiarism. Please try again.' } });
+    } finally {
+      setIsCheckingPlagiarism(false);
+    }
   };
 
   const generateAIDraft = async (customPrompt?: string) => {
@@ -1883,8 +2279,18 @@ export default function AdvancedSessionPage() {
         isOpen={showDownloadModal}
         onClose={() => setShowDownloadModal(false)}
         onDownload={handleExport}
+        onAdvancedDownload={handleAdvancedExport}
         currentTemplate={pdfTemplate}
       />
+
+      {/* Plagiarism Report Modal */}
+      {modal.type === 'plagiarism-report' && (
+        <PlagiarismReportModal
+          isOpen={modal.type === 'plagiarism-report'}
+          onClose={() => setModal({ type: '' })}
+          report={modal.data}
+        />
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -2197,6 +2603,14 @@ export default function AdvancedSessionPage() {
                   >
                     <FiMaximize className="w-4 h-4 mr-2" />
                     Fullscreen
+                  </button>
+                  <button 
+                    onClick={checkPlagiarism}
+                    disabled={isCheckingPlagiarism || !currentDraft.trim()}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:bg-gray-400 flex items-center transition-colors"
+                  >
+                    <FiAlertCircle className="w-4 h-4 mr-2" />
+                    {isCheckingPlagiarism ? 'Checking...' : 'Check Plagiarism'}
                   </button>
                   <button 
                     onClick={() => setShowDownloadModal(true)}
@@ -2536,3 +2950,4 @@ export default function AdvancedSessionPage() {
     </Layout>
   );
 }
+

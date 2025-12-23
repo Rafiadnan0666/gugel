@@ -1,25 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import * as cheerio from 'cheerio';
+import { WebScraper } from '@/lib/web-scraper';
 
-async function fetchPageContent(url: string): Promise<{ title: string, body: string }> {
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch page: ${response.statusText}`);
-    }
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    const title = $('title').text();
-    const body = $('body').text().replace(/\s\s+/g, ' ').trim();
-    return { title, body };
-  } catch (error) {
-    console.error('Error fetching page content:', error);
-    // Return a generic error message or handle as needed
-    return { title: 'Error', body: 'Could not fetch content from the URL.' };
-  }
-}
+const webScraper = new WebScraper();
 
 export async function POST(request: Request) {
   const { url } = await request.json();
@@ -47,11 +31,42 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  try {
-    const { title, body } = await fetchPageContent(url);
-    const summary = body.slice(0, 500) + (body.length > 500 ? '...' : '');
+try {
+    const scrapingReport = await webScraper.scrapeWebsite(url);
+    if (!scrapingReport.success || !scrapingReport.content) {
+      return NextResponse.json({ 
+        error: 'Failed to fetch content from URL',
+        details: scrapingReport.errors 
+      }, { status: 500 });
+    }
 
-    return NextResponse.json({ summary, title });
+    // Create intelligent summary based on content
+    const { content, title, metadata } = scrapingReport.content;
+    let summary: string;
+
+    if (metadata.readingTime <= 2) {
+      // Short content - use first paragraph
+      summary = content.split('\n')[0]?.substring(0, 500) || '';
+    } else {
+      // Longer content - create a more comprehensive summary
+      const sentences = content.split('.').filter(s => s.trim().length > 10);
+      summary = sentences.slice(0, 3).join('. ').substring(0, 500);
+    }
+
+    if (content.length > 500) {
+      summary += '...';
+    }
+
+    return NextResponse.json({ 
+      summary: summary.trim(), 
+      title,
+      metadata: {
+        wordCount: metadata.wordCount,
+        readingTime: metadata.readingTime,
+        author: metadata.author,
+        publishDate: metadata.publishDate
+      }
+    });
   } catch (error) {
     console.error('Error summarizing URL:', error);
     return NextResponse.json({ error: 'Failed to summarize URL' }, { status: 500 });

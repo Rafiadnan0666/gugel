@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import * as cheerio from 'cheerio';
+import { WebScraper } from '@/lib/web-scraper';
 
 // This is a placeholder for a real generative AI model call.
 // In a real application, you would use an SDK from a provider like Google AI, OpenAI, etc.
@@ -21,41 +21,10 @@ async function runGenerativeAI(prompt: string): Promise<string> {
   return 'This is a generic response from the server-side AI model.';
 }
 
-async function fetchPageContent(url: string): Promise<{ title: string, body: string } | null> {
-  try {
-    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!response.ok) {
-      return null;
-    }
-    const html = await response.text();
-    const $ = cheerio.load(html);
-
-    // Remove unwanted elements
-    $('script, style, noscript, iframe, footer, header, nav').remove();
-    $('[aria-hidden="true"]').remove();
-    $('[class*="ad"], [id*="ad"], [class*="banner"], [id*="banner"]').remove();
-
-    const title = $('title').first().text() || $('h1').first().text();
-    
-    // Try to get content from common main content selectors
-    let body = $('article').text() || $('main').text() || $('.post').text() || $('#content').text();
-
-    if (!body) {
-      body = $('body').text();
-    }
-
-    // Clean up whitespace
-    body = body.replace(/\s\s+/g, ' ').trim();
-
-    return { title, body };
-  } catch (error) {
-    console.error('Error fetching page content:', error);
-    return null;
-  }
-}
+const webScraper = new WebScraper();
 
 export async function POST(request: Request) {
-  const { prompt, task, context } = await request.json();
+  const { prompt, task } = await request.json();
 
   if (!prompt || !task) {
     return NextResponse.json({ error: 'prompt and task are required' }, { status: 400 });
@@ -80,17 +49,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  try {
+try {
     let result;
     if (task === 'summarize-url') {
-      const pageData = await fetchPageContent(prompt);
-      if (!pageData || !pageData.body) {
-        return NextResponse.json({ error: 'Failed to fetch content from URL' }, { status: 500 });
+      const scrapingReport = await webScraper.scrapeWebsite(prompt);
+      if (!scrapingReport.success || !scrapingReport.content) {
+        return NextResponse.json({ 
+          error: 'Failed to fetch content from URL',
+          details: scrapingReport.errors 
+        }, { status: 500 });
       }
-      const summarizationPrompt = `Summarize the following content: ${pageData.body.substring(0, 8000)}`;
+      const summarizationPrompt = `Summarize the following content: ${scrapingReport.content.content.substring(0, 8000)}`;
       result = await runGenerativeAI(summarizationPrompt);
-      // Include title in the response
-      return NextResponse.json({ result, title: pageData.title });
+      // Include comprehensive data in the response
+      return NextResponse.json({ 
+        result, 
+        title: scrapingReport.content.title,
+        metadata: scrapingReport.content.metadata,
+        summary: scrapingReport.summary,
+        url: scrapingReport.content.url
+      });
+    } else if (task === 'analyze-url') {
+      const scrapingReport = await webScraper.scrapeWebsite(prompt);
+      if (!scrapingReport.success) {
+        return NextResponse.json({ 
+          error: 'Failed to analyze URL',
+          details: scrapingReport.errors 
+        }, { status: 500 });
+      }
+      return NextResponse.json({ report: scrapingReport });
     } else {
       result = await runGenerativeAI(prompt);
       return NextResponse.json({ result });
