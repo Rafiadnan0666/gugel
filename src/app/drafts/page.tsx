@@ -421,8 +421,8 @@ export default function DraftListPage() {
       }
     }
 
-    affectedSessions.forEach(sessionId => loadDrafts(sessionId));
-    
+    affectedSessions.forEach(sessionId => loadDrafts(sessionId as string));
+
     setShowBulkActions(false);
     setSelectedDrafts([]);
     alert('Deleted ' + selectedDrafts.length + ' drafts');
