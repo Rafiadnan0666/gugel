@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
+import { useAIService } from '@/hooks/useAIService';
 import type { IDraft, IProfile, IResearchSession, IComment } from '@/types/main.db';
 import { exportToPDF } from '@/lib/pdf';
 
@@ -22,13 +23,7 @@ import {
   FiType, FiColumns, FiCode, FiMinus, FiCheck
 } from 'react-icons/fi';
 
-// Simple fallback for AI service if hook fails
-const useAIService = () => ({
-  aiStatus: 'ready' as 'loading' | 'ready' | 'error' | 'unavailable',
-  generateSummary: async (content: string) => `Summary: ${content.substring(0, 100)}...`,
-  rewriteContent: async (content: string) => `Improved: ${content}`,
-  translateContent: async (content: string) => `Translated: ${content}`,
-});
+
 
 // Simple fallback for collaboration if hook fails
 const useDraftCollaboration = () => ({
@@ -116,7 +111,7 @@ export default function DraftEditPage() {
   const [selectedText, setSelectedText] = useState('');
   const saveIntervalRef = useRef<NodeJS.Timeout>();
 
-  const { aiStatus, generateSummary, rewriteContent, translateContent } = useAIService();
+  const { aiStatus, generateSummary, rewriteContent, expandContent, translateContent } = useAIService();
   const { onlineUsers, cursorPositions } = useDraftCollaboration();
 
   // Enhanced templates
@@ -571,7 +566,7 @@ Frequently asked questions and answers...`
 
   // Custom improveWriting function
   const improveWriting = async (content: string): Promise<string> => {
-    return await rewriteContent(content);
+    return await rewriteContent(content, 'professional');
   };
 
   const handleAIAction = async (action: string, content: string, options?: any) => {
@@ -581,25 +576,25 @@ Frequently asked questions and answers...`
       
       switch (action) {
         case 'summarize':
-          result = await generateSummary(targetContent);
+          result = await generateSummary(targetContent, 'draft');
           break;
         case 'rewrite':
-          result = await rewriteContent(targetContent);
+          result = await rewriteContent(targetContent, 'professional');
           break;
         case 'translate':
-          result = await translateContent(targetContent);
+          result = await translateContent(targetContent, options?.language || 'English');
           break;
         case 'expand':
-          result = await rewriteContent(targetContent);
+          result = await expandContent(targetContent);
           break;
         case 'simplify':
-          result = await rewriteContent(targetContent);
+          result = await rewriteContent(targetContent, 'simple');
           break;
         case 'improve':
           result = await improveWriting(targetContent);
           break;
         case 'formalize':
-          result = await rewriteContent(targetContent);
+          result = await rewriteContent(targetContent, 'formal');
           break;
         default:
           result = targetContent;
