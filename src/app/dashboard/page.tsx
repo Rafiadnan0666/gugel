@@ -28,7 +28,15 @@ import {
   FiAward,
   FiGlobe,
   FiClock,
-  FiAlertCircle
+  FiAlertCircle,
+  FiExternalLink,
+  FiCopy,
+  FiCheck,
+  FiLoader,
+  FiShield,
+  FiCode,
+  FiDatabase,
+  FiTrendingDown
 } from 'react-icons/fi';
 import { toast } from 'react-hot-toast';
 
@@ -135,6 +143,32 @@ export default function Dashboard() {
   const [activeView, setActiveView] = useState<'sessions' | 'drafts' | 'teams'>('sessions');
   const [activityData, setActivityData] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Advanced Features State
+  const [showAdvancedCreate, setShowAdvancedCreate] = useState(false);
+  const [sessionUrls, setSessionUrls] = useState<string[]>(['']);
+  const [isAnalyzingUrls, setIsAnalyzingUrls] = useState(false);
+  const [urlAnalysis, setUrlAnalysis] = useState<any[]>([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [selectedSessions, setSelectedSessions] = useState<string[]>([]);
+  const [exportModal, setExportModal] = useState(false);
+  const [plagiarismModal, setPlagiarismModal] = useState(false);
+  const [aiEnhancement, setAiEnhancement] = useState({
+    autoGenerateInsights: true,
+    smartSuggestions: true,
+    predictiveAnalytics: true
+  });
+  
+  // Session Creation Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [exportOptions, setExportOptions] = useState({
+    template: 'comprehensive',
+    includeSources: true,
+    plagiarismCheck: false,
+    batchProcessing: true
+  });
   
   // Enhanced AI State Management
   const [aiState, setAiState] = useState<{
@@ -629,6 +663,209 @@ Please provide a helpful, specific response based on this research context. Focu
     } catch (error) {
       console.error('Error creating session:', error);
       toast.error('Failed to create session');
+    }
+  };
+
+  // Enhanced URL Analysis Function
+  const analyzeUrls = async () => {
+    const validUrls = sessionUrls.filter(url => url.trim() && (url.startsWith('http') || url.startsWith('https')));
+    if (validUrls.length === 0) {
+      toast.error('Please enter at least one valid URL');
+      return;
+    }
+
+    setIsAnalyzingUrls(true);
+    setUrlAnalysis([]);
+
+    try {
+      const analysisResults = await Promise.all(
+        validUrls.map(async (url) => {
+          const response = await fetch('/api/scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ urls: url, task: 'scrape-single' })
+          });
+          
+          const result = await response.json();
+          return {
+            url,
+            ...result.result
+          };
+        })
+      );
+
+      setUrlAnalysis(analysisResults);
+      toast.success(`Successfully analyzed ${validUrls.length} URLs`);
+      
+      // Auto-create tabs from successful analysis
+      const successfulAnalyses = analysisResults.filter(analysis => analysis.success);
+      if (successfulAnalyses.length > 0) {
+        await createTabsFromAnalysis(successfulAnalyses);
+      }
+      
+    } catch (error) {
+      console.error('URL analysis failed:', error);
+      toast.error('Failed to analyze URLs');
+    } finally {
+      setIsAnalyzingUrls(false);
+    }
+  };
+
+  // Create tabs from URL analysis
+  const createTabsFromAnalysis = async (analyses: any[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      for (const analysis of analyses) {
+        await supabase.from('tabs').insert({
+          url: analysis.url,
+          title: analysis.content?.title || 'Untitled Source',
+          content: analysis.content?.content || '',
+          user_id: user.id,
+          created_at: new Date().toISOString()
+        });
+      }
+
+      // Reload dashboard data
+      await loadDashboardData();
+      toast.success(`Created ${analyses.length} research tabs from analysis`);
+    } catch (error) {
+      console.error('Failed to create tabs:', error);
+      toast.error('Failed to create tabs from analysis');
+    }
+  };
+
+  // Advanced session creation with URL analysis
+  const createAdvancedSession = async (includeAnalysis: boolean = false) => {
+    if (!newSessionTitle.trim()) {
+      toast.error('Please enter a session title');
+      return;
+    }
+
+    setIsCreatingSession(true);
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      let sessionData: any = {
+        user_id: user.id,
+        title: newSessionTitle,
+        created_at: new Date().toISOString()
+      };
+
+      // Add URL analysis data if available
+      if (includeAnalysis && urlAnalysis.length > 0) {
+        sessionData.metadata = {
+          urlAnalysis: urlAnalysis,
+          totalUrlsAnalyzed: urlAnalysis.length,
+          averageSeoScore: urlAnalysis.reduce((sum: number, a: any) => sum + (a.summary?.seoScore || 0), 0) / urlAnalysis.length
+        };
+      }
+
+      const { data, error } = await supabase
+        .from('research_sessions')
+        .insert([sessionData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Advanced research session created');
+      setShowCreateModal(false);
+      
+      // Clear URL analysis after creating session
+      setSessionUrls(['']);
+      setUrlAnalysis([]);
+      
+      // Navigate to new session
+      router.push(`/session/${data.id}`);
+    } catch (error) {
+      console.error('Error creating session:', error);
+      toast.error('Failed to create session');
+    } finally {
+      setIsCreatingSession(false);
+    }
+  };
+
+  // Bulk export functionality
+  const handleBulkExport = async (template: string = 'comprehensive') => {
+    if (selectedSessions.length === 0) {
+      toast.error('Please select sessions to export');
+      return;
+    }
+
+    try {
+      const selectedSessionData = sessions.filter(session => selectedSessions.includes(session.id));
+      
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessions: selectedSessionData,
+          template,
+          includeSources: exportOptions.includeSources,
+          plagiarismCheck: exportOptions.plagiarismCheck,
+          batchProcessing: exportOptions.batchProcessing
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const result = await response.json();
+      
+      // Download the generated PDF
+      const link = document.createElement('a');
+      link.href = result.pdf_url;
+      link.download = `bulk-export-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success(`Exported ${selectedSessions.length} sessions successfully`);
+      setExportModal(false);
+      setSelectedSessions([]);
+    } catch (error) {
+      console.error('Bulk export failed:', error);
+      toast.error('Failed to export sessions');
+    }
+  };
+
+  // Bulk plagiarism check
+  const handleBulkPlagiarismCheck = async () => {
+    if (selectedSessions.length === 0) {
+      toast.error('Please select sessions to check for plagiarism');
+      return;
+    }
+
+    const selectedSessionData = sessions.filter(session => selectedSessions.includes(session.id));
+    const draftsToCheck = drafts.filter(draft => selectedSessions.includes(draft.research_session_id));
+
+    if (draftsToCheck.length === 0) {
+      toast.error('No drafts found for selected sessions');
+      return;
+    }
+
+    try {
+      const results = await Promise.all(
+        draftsToCheck.map(async (draft) => {
+          const response = await fetch('/api/plagiarism', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: draft.content })
+          });
+          return await response.json();
+        })
+      );
+
+      setPlagiarismModal(true);
+      toast.success(`Plagiarism check completed for ${draftsToCheck.length} drafts`);
+    } catch (error) {
+      console.error('Bulk plagiarism check failed:', error);
+      toast.error('Failed to check plagiarism');
     }
   };
 

@@ -7,7 +7,10 @@ import Layout from '@/components/Layout';
 import type { IDraft, IResearchSession } from '@/types/main.db';
 import {
   FiPlus, FiEdit3, FiTrash2, FiCopy, FiChevronDown,
-  FiChevronRight
+  FiChevronRight, FiShield, FiDownload, FiBarChart2,
+  FiZap, FiSearch, FiFilter, FiEye, FiEyeOff,
+  FiCheck, FiX, FiAlertCircle, FiDatabase,
+  FiTrendingUp, FiCode, FiFileText, FiLayers
 } from 'react-icons/fi';
 import { useAIService } from '@/hooks/useAIService';
 import dynamic from 'next/dynamic';
@@ -29,6 +32,25 @@ export default function DraftListPage() {
   const [hasMoreSessions, setHasMoreSessions] = useState(true);
   const [draftsPage, setDraftsPage] = useState<Record<string, number>>({});
   const [hasMoreDrafts, setHasMoreDrafts] = useState<Record<string, boolean>>({});
+  
+  // Advanced Features State
+  const [selectedDrafts, setSelectedDrafts] = useState<string[]>([]);
+  const [showBulkActions, setShowBulkActions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'plagiarized' | 'original'>('all');
+  const [plagiarismReports, setPlagiarismReports] = useState<Record<string, any>>({});
+  const [showAdvancedExport, setShowAdvancedExport] = useState(false);
+  const [exportOptions, setExportOptions] = useState({
+    template: 'comprehensive',
+    includeSources: true,
+    plagiarismCheck: false,
+    batchProcessing: true
+  });
+  const [aiEnhancements, setAiEnhancements] = useState({
+    autoSummary: true,
+    smartRewrite: true,
+    qualityAnalysis: true
+  });
 
   useEffect(() => {
     const loadSessions = async () => {
@@ -125,6 +147,298 @@ export default function DraftListPage() {
     await supabase.from(type === 'session' ? 'research_sessions' : 'drafts').delete().eq('id', id);
     if (type === 'session') setSessionPage(1);
     else if (sessionId) loadDrafts(sessionId);
+  };
+
+  // Advanced Features Functions
+  const checkPlagiarism = async (draftId: string) => {
+    const draft = drafts[draftId]?.find(d => d.id === draftId);
+    if (!draft || !draft.content) {
+      alert('No content available for plagiarism check');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/plagiarism', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: draft.content })
+      });
+
+      if (!response.ok) {
+        throw new Error('Plagiarism check failed');
+      }
+
+      const result = await response.json();
+      setPlagiarismReports(prev => ({
+        ...prev,
+        [draftId]: result.result
+      }));
+      
+      // Show plagiarism report in modal
+      openModal('draft', { ...draft, plagiarismReport: result.result });
+    } catch (error) {
+      console.error('Plagiarism check failed:', error);
+      alert('Failed to check plagiarism. Please try again.');
+    }
+  };
+
+  const enhanceDraftWithAI = async (draftId: string) => {
+    const draft = drafts[draftId]?.find(d => d.id === draftId);
+    if (!draft || !draft.content) {
+      alert('No content available for AI enhancement');
+      return;
+    }
+
+    try {
+      // Split content into sections for better AI processing
+      const sections = splitContentIntoSections(draft.content);
+      
+      const enhancedSections = await Promise.all(
+        sections.map(async (section, index) => {
+          const response = await fetch('/api/ai', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              prompt: `Enhance this research section for academic quality and clarity. Section title: "${section.title}". Content: ${section.content}`,
+              task: 'enhance-content'
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error('AI enhancement failed');
+          }
+
+          const result = await response.json();
+          return {
+            ...section,
+            enhancedContent: result.result || section.content
+          };
+        })
+      );
+
+      const enhancedContent = enhancedSections
+        .map(section => section.enhancedContent)
+        .join('\n\n');
+
+      // Update the draft with enhanced content
+      await supabase
+        .from('drafts')
+        .update({ 
+          content: enhancedContent,
+          version: (draft.version || 0) + 1
+        })
+        .eq('id', draftId);
+
+      loadDrafts(draft.research_session_id);
+      alert('Draft enhanced successfully with AI!');
+    } catch (error) {
+      console.error('AI enhancement failed:', error);
+      alert('Failed to enhance draft with AI. Please try again.');
+    }
+  };
+
+  const splitContentIntoSections = (content: string): Array<{title: string, content: string}> => {
+    const paragraphs = content.split('\n\n');
+    const sections: Array<{title: string, content: string}> = [];
+    
+    let currentSection: {title: string, content: string} = {
+      title: 'Introduction',
+      content: ''
+    };
+
+    paragraphs.forEach((paragraph, index) => {
+      if (paragraph.includes('#') || paragraph.includes('##') || paragraph.includes('###')) {
+        if (currentSection.content.trim()) {
+          sections.push(currentSection);
+        }
+        const title = paragraph.replace(/#+\s*/, '').trim() || `Section ${sections.length + 1}`;
+        currentSection = { title, content: '' };
+      } else {
+        currentSection.content += (currentSection.content ? '\n\n' : '') + paragraph;
+      }
+    });
+
+    if (currentSection.content.trim()) {
+      sections.push(currentSection);
+    }
+
+    return sections;
+  };
+
+  const handleBulkAction = async (action: string) => {
+    if (selectedDrafts.length === 0) {
+      alert('Please select drafts first');
+      return;
+    }
+
+    try {
+      switch (action) {
+        case 'export':
+          await handleBulkExport();
+          break;
+        case 'plagiarism':
+          await handleBulkPlagiarismCheck();
+          break;
+        case 'enhance':
+          await handleBulkEnhance();
+          break;
+        case 'delete':
+          if (confirm(`Are you sure you want to delete ${selectedDrafts.length} drafts?`)) {
+            await handleBulkDelete();
+          }
+          break;
+      }
+    } catch (error) {
+      console.error('Bulk action failed:', error);
+      alert('Failed to perform bulk action');
+    }
+  };
+
+  const handleBulkExport = async () => {
+    const selectedDraftData: IDraft[] = [];
+    
+    for (const draftId of selectedDrafts) {
+      for (const sessionId in drafts) {
+        const draft = drafts[sessionId].find(d => d.id === draftId);
+        if (draft) {
+          selectedDraftData.push(draft);
+          break;
+        }
+      }
+    }
+
+    try {
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: selectedDraftData.map(d => d.content).join('\n\n===\n\n'),
+          template: exportOptions.template,
+          includeSources: false,
+          plagiarismCheck: exportOptions.plagiarismCheck,
+          batchProcessing: exportOptions.batchProcessing
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Export failed');
+      }
+
+      const result = await response.json();
+      
+      // Download the PDF
+      const link = document.createElement('a');
+      link.href = result.pdf_url;
+      link.download = `bulk-export-drafts-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      setShowBulkActions(false);
+      setSelectedDrafts([]);
+      alert(`Successfully exported ${selectedDraftData.length} drafts`);
+    } catch (error) {
+      console.error('Bulk export failed:', error);
+      throw error;
+    }
+  };
+
+  const handleBulkPlagiarismCheck = async () => {
+    const results = [];
+    
+    for (const draftId of selectedDrafts) {
+      for (const sessionId in drafts) {
+        const draft = drafts[sessionId].find(d => d.id === draftId);
+        if (draft) {
+          try {
+            const response = await fetch('/api/plagiarism', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content: draft.content })
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              results.push({ draftId, result: result.result });
+            }
+          } catch (error) {
+            console.error(`Plagiarism check failed for draft ${draftId}:`, error);
+          }
+          break;
+        }
+      }
+    }
+
+    // Update plagiarism reports
+    const newReports = { ...plagiarismReports };
+    results.forEach(({ draftId, result }) => {
+      newReports[draftId] = result;
+    });
+    setPlagiarismReports(newReports);
+
+    setShowBulkActions(false);
+    setSelectedDrafts([]);
+    alert(`Plagiarism check completed for ${results.length} drafts`);
+  };
+
+  const handleBulkEnhance = async () => {
+    const enhancementPromises = [];
+    
+    for (const draftId of selectedDrafts) {
+      for (const sessionId in drafts) {
+        const draft = drafts[sessionId].find(d => d.id === draftId);
+        if (draft) {
+          enhancementPromises.push(enhanceDraftWithAI(draftId));
+          break;
+        }
+      }
+    }
+
+    await Promise.all(enhancementPromises);
+    setShowBulkActions(false);
+    setSelectedDrafts([]);
+    alert(`Enhanced ${selectedDrafts.length} drafts with AI`);
+  };
+
+  const handleBulkDelete = async () => {
+    for (const draftId of selectedDrafts) {
+      for (const sessionId in drafts) {
+        const draft = drafts[sessionId].find(d => d.id === draftId);
+        if (draft) {
+          await supabase.from('drafts').delete().eq('id', draftId);
+          break;
+        }
+      }
+    }
+
+    // Reload all affected sessions
+    const affectedSessions = new Set();
+    for (const draftId of selectedDrafts) {
+      for (const sessionId in drafts) {
+        if (drafts[sessionId].some(d => d.id === draftId)) {
+          affectedSessions.add(sessionId);
+        }
+      }
+    }
+
+    affectedSessions.forEach(sessionId => loadDrafts(sessionId));
+    
+    setShowBulkActions(false);
+    setSelectedDrafts([]);
+    alert(`Deleted ${selectedDrafts.length} drafts`);
+  };
+
+  const toggleDraftSelection = (draftId: string) => {
+    setSelectedDrafts(prev => 
+      prev.includes(draftId) 
+        ? prev.filter(id => id !== draftId)
+        : [...prev, draftId]
+    );
+  };
+
+  const selectAllDrafts = (sessionId: string) => {
+    const allDraftIds = drafts[sessionId]?.map(d => d.id) || [];
+    setSelectedDrafts(allDraftIds);
   };
 
   return (
