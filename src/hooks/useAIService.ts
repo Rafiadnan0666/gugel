@@ -149,6 +149,88 @@ export const useAIService = () => {
     }
   };
 
+  const analyzeUrlWithAI = async (url: string) => {
+    try {
+      const response = await fetch('/api/url/analyze-enhanced', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'URL analysis failed');
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Enhanced URL analysis error:', error);
+      throw error;
+    }
+  };
+
+  const rewriteContentWithContext = async (
+    content: string, 
+    style: string,
+    context?: {
+      researchTopic?: string;
+      targetAudience?: string;
+      existingSources?: any[];
+      writingGoals?: string[];
+      preserveCitations?: boolean;
+      improveStructure?: boolean;
+    }
+  ) => {
+    const prompt = `Rewrite the following content in a ${style} style while preserving the core meaning and structure.
+
+${context?.researchTopic ? `Research Topic: ${context.researchTopic}` : ''}
+${context?.targetAudience ? `Target Audience: ${context.targetAudience}` : ''}
+${context?.writingGoals?.length ? `Writing Goals: ${context.writingGoals.join(', ')}` : ''}
+
+Requirements:
+- ${context?.preserveCitations !== false ? 'Preserve all citations and references' : 'Citations can be modified for clarity'}
+- ${context?.improveStructure !== false ? 'Improve sentence structure and flow' : 'Maintain original structure'}
+- Maintain academic integrity and avoid plagiarism
+- Keep the same approximate length
+- Ensure all key points are retained
+
+Content to rewrite:
+"""${content}"""
+
+Please provide:
+1. The rewritten content
+2. A summary of improvements made
+3. Quality metrics (clarity, coherence, academic tone)
+4. Any recommendations for further improvement`;
+
+    return await promptAI(prompt, 'rewrite-contextual', { context });
+  };
+
+  const assessContentQuality = async (content: string) => {
+    const prompt = `Analyze the following content for quality and provide detailed metrics:
+
+Content:
+"""${content}"""
+
+Please assess and provide:
+1. Overall quality score (0-100)
+2. Clarity score (0-100)
+3. Coherence score (0-100)
+4. Academic tone score (0-100)
+5. Grammar and syntax issues
+6. Structural improvements needed
+7. Suggestions for enhancement
+8. Reading difficulty level
+9. Factual accuracy indicators
+
+Provide the analysis in a structured JSON format.`;
+
+    return await promptAI(prompt, 'assess-quality');
+  };
+
   const chatWithAI = async (message: string, context: { tabs: ITab[], drafts: IDraft[] }) => {
     const contextSummary = `The user has ${context.tabs.length} research tabs and ${context.drafts.length} drafts.`;
     const prompt = `${contextSummary}\n\nUser's question: ${message}`;
@@ -161,10 +243,13 @@ export const useAIService = () => {
     generateSummary,
     processTabsSummary,
     rewriteContent,
+    rewriteContentWithContext,
+    assessContentQuality,
     translateContent,
     expandContent,
     summarizeUrl,
     summarizeUrlWithLocalAI,
+    analyzeUrlWithAI,
     chatWithAI,
   };
 };

@@ -14,6 +14,7 @@ import {
 } from 'react-icons/fi';
 import { useAIService } from '@/hooks/useAIService';
 import dynamic from 'next/dynamic';
+import DraftQualityAssessment from '@/components/drafts/DraftQualityAssessment';
 
 const ProEditor = dynamic(() => import('@/components/editor/ProEditor').then(mod => mod.ProEditor), { ssr: false });
 
@@ -27,7 +28,7 @@ export default function DraftListPage() {
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<{ isOpen: boolean; type: 'session' | 'draft'; item?: any }>({ isOpen: false, type: 'session' });
   const [content, setContent] = useState('');
-  const { aiStatus, generateSummary, rewriteContent } = useAIService();
+  const { aiStatus, generateSummary, rewriteContent, rewriteContentWithContext, assessContentQuality } = useAIService();
   const [sessionPage, setSessionPage] = useState(1);
   const [hasMoreSessions, setHasMoreSessions] = useState(true);
   const [draftsPage, setDraftsPage] = useState<Record<string, number>>({});
@@ -46,9 +47,27 @@ export default function DraftListPage() {
     plagiarismCheck: false,
     batchProcessing: true
   });
+  
+  // Quality Assessment State
+  const [qualityAssessment, setQualityAssessment] = useState<{
+    isOpen: boolean;
+    draftId?: string;
+    metrics?: any;
+    suggestions?: string[];
+    improvements?: any[];
+    isAnalyzing?: boolean;
+  }>({ isOpen: false });
+  
+  const [selectedDraftForRewrite, setSelectedDraftForRewrite] = useState<{
+    id: string;
+    content: string;
+    title: string;
+  } | null>(null);
   const [aiEnhancements, setAiEnhancements] = useState({
     autoSummary: true,
     smartRewrite: true,
+    contextualRewrite: true,
+    qualityAssessment: true,
     qualityAnalysis: true
   });
 
@@ -129,12 +148,118 @@ export default function DraftListPage() {
     setModal({ isOpen: false, type: 'session' });
   };
 
-  const handleAIAction = async (action: string, text: string) => {
+  const handleAIAction = async (action: string, text: string, context?: any) => {
     if (action === 'summarize') return await generateSummary(text, 'draft');
     if (action === 'rewrite') return await rewriteContent(text, 'academic');
     if (action === 'simplify') return await rewriteContent(text, 'simple');
     if (action === 'formalize') return await rewriteContent(text, 'formal');
+    if (action === 'contextual-rewrite' && context) {
+      return await rewriteContentWithContext(text, context.style || 'academic', {
+        researchTopic: context.researchTopic,
+        targetAudience: context.targetAudience,
+        existingSources: context.existingSources || [],
+        writingGoals: context.writingGoals || [],
+        preserveCitations: context.preserveCitations !== false,
+        improveStructure: context.improveStructure !== false
+      });
+    }
+    if (action === 'assess-quality') {
+      return await assessContentQuality(text);
+    }
     return text;
+  };
+
+  const assessDraftQuality = async (draftId: string, content: string) => {
+    setQualityAssessment({
+      isOpen: true,
+      draftId,
+      isAnalyzing: true
+    });
+
+    try {
+      const assessment = await assessContentQuality(content);
+      const parsedAssessment = typeof assessment === 'string' ? 
+        JSON.parse(assessment) : assessment;
+
+      setQualityAssessment({
+        isOpen: true,
+        draftId,
+        metrics: {
+          overall: parsedAssessment.overallQualityScore || 75,
+          clarity: parsedAssessment.clarityScore || 75,
+          coherence: parsedAssessment.coherenceScore || 75,
+          academicTone: parsedAssessment.academicToneScore || 75,
+          grammar: parsedAssessment.grammarScore || 85,
+          structure: parsedAssessment.structureScore || 80,
+          originality: parsedAssessment.originalityScore || 90,
+          readingLevel: parsedAssessment.readingDifficulty || 'medium',
+          wordCount: content.split(/\s+/).length,
+          sentenceCount: content.split(/[.!?]+/).length,
+          avgSentenceLength: Math.round(content.split(/\s+/).length / content.split(/[.!?]+/).length)
+        },
+        suggestions: parsedAssessment.suggestionsForEnhancement || [],
+        improvements: (parsedAssessment.structuralImprovements || []).map((improvement: string, index: number) => ({
+          type: 'Structure',
+          description: improvement,
+          priority: index < 2 ? 'high' : index < 4 ? 'medium' : 'low'
+        })),
+        isAnalyzing: false
+      });
+    } catch (error) {
+      console.error('Quality assessment failed:', error);
+      setQualityAssessment(prev => ({
+        ...prev,
+        isAnalyzing: false,
+        suggestions: ['Analysis failed. Please try again.'],
+        improvements: []
+      }));
+    }
+  };
+
+  const openContextualRewrite = (draft: IDraft) => {
+    setSelectedDraftForRewrite({
+      id: draft.id,
+      content: draft.content,
+      title: draft.content.substring(0, 50) + '...'
+    });
+  };
+
+  const applyContextualRewrite = async (context: any) => {
+    if (!selectedDraftForRewrite) return;
+
+    try {
+      const result = await rewriteContentWithContext(
+        selectedDraftForRewrite.content,
+        context.style || 'academic',
+        {
+          researchTopic: context.researchTopic,
+          targetAudience: context.targetAudience,
+          existingSources: [],
+          writingGoals: context.writingGoals?.split(',').map((g: string) => g.trim()) || [],
+          preserveCitations: context.preserveCitations !== false,
+          improveStructure: context.improveStructure !== false
+        }
+      );
+
+      if (result?.rewrittenContent) {
+        // Update the draft in database
+        await supabase
+          .from('drafts')
+          .update({ content: result.rewrittenContent })
+          .eq('id', selectedDraftForRewrite.id);
+
+        // Close modal and refresh drafts
+        setSelectedDraftForRewrite(null);
+        // Refresh the drafts for the affected session
+        const affectedSessionId = drafts[selectedDraftForRewrite.id]?.[0]?.research_session_id;
+        if (affectedSessionId) {
+          loadDrafts(affectedSessionId);
+        }
+      }
+    } catch (error) {
+      console.error('Contextual rewrite failed:', error);
+      alert('Failed to apply rewrite. Please try again.');
+    }
   };
 
   const duplicateDraft = async (draft: IDraft) => {
@@ -478,9 +603,33 @@ export default function DraftListPage() {
                         <div className="prose prose-sm line-clamp-4 mb-3" dangerouslySetInnerHTML={{ __html: draft.content || 'Empty draft' }} />
                         <div className="text-xs text-gray-500 mb-3">v{draft.version}</div>
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => router.push(`/drafts/${draft.id}`)} className="p-2 rounded-md hover:bg-gray-200"><FiEdit3 /></button>
-                          <button onClick={() => duplicateDraft(draft)} className="p-2 rounded-md hover:bg-gray-200"><FiCopy /></button>
-                          <button onClick={() => deleteItem('draft', draft.id, session.id)} className="p-2 rounded-md hover:bg-red-100 text-red-600"><FiTrash2 /></button>
+                          <button 
+                            onClick={() => router.push(`/drafts/${draft.id}`)} 
+                            className="p-2 rounded-md hover:bg-gray-200" 
+                            title="Edit Draft"
+                          >
+                            <FiEdit3 />
+                          </button>
+                          <button 
+                            onClick={() => openContextualRewrite(draft)} 
+                            className="p-2 rounded-md hover:bg-blue-100 text-blue-600" 
+                            title="Contextual Rewrite"
+                          >
+                            <FiZap />
+                          </button>
+                          <button 
+                            onClick={() => assessDraftQuality(draft.id, draft.content)} 
+                            className="p-2 rounded-md hover:bg-green-100 text-green-600" 
+                            title="Assess Quality"
+                          >
+                            <FiBarChart2 />
+                          </button>
+                          <button onClick={() => duplicateDraft(draft)} className="p-2 rounded-md hover:bg-gray-200" title="Duplicate">
+                            <FiCopy />
+                          </button>
+                          <button onClick={() => deleteItem('draft', draft.id, session.id)} className="p-2 rounded-md hover:bg-red-100 text-red-600" title="Delete">
+                            <FiTrash2 />
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -533,6 +682,178 @@ export default function DraftListPage() {
           </div>
         </div>
       )}
+
+      {/* Quality Assessment Modal */}
+      {qualityAssessment.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b p-6 flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Content Quality Assessment</h2>
+              <button 
+                onClick={() => setQualityAssessment({ isOpen: false })}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <FiX />
+              </button>
+            </div>
+            <div className="p-6">
+              <DraftQualityAssessment
+                metrics={qualityAssessment.metrics}
+                suggestions={qualityAssessment.suggestions || []}
+                improvements={qualityAssessment.improvements || []}
+                isAnalyzing={qualityAssessment.isAnalyzing || false}
+                onApplyImprovement={(improvement) => {
+                  // Handle improvement application
+                  console.log('Applying improvement:', improvement);
+                  setQualityAssessment({ isOpen: false });
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contextual Rewrite Modal */}
+      {selectedDraftForRewrite && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">Contextual Rewrite</h2>
+                  <p className="text-gray-600">
+                    Rewriting: <span className="font-medium">{selectedDraftForRewrite.title}</span>
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setSelectedDraftForRewrite(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <FiX />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Writing Style
+                  </label>
+                  <select 
+                    id="rewrite-style"
+                    className="w-full p-3 border rounded-lg"
+                    defaultValue="academic"
+                  >
+                    <option value="academic">Academic</option>
+                    <option value="professional">Professional</option>
+                    <option value="casual">Casual</option>
+                    <option value="formal">Formal</option>
+                    <option value="simple">Simple</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Research Topic
+                  </label>
+                  <input 
+                    type="text"
+                    id="research-topic"
+                    placeholder="e.g., Climate Change, Machine Learning"
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Target Audience
+                  </label>
+                  <select 
+                    id="target-audience"
+                    className="w-full p-3 border rounded-lg"
+                  >
+                    <option value="academic">Academic Researchers</option>
+                    <option value="general">General Public</option>
+                    <option value="business">Business Professionals</option>
+                    <option value="students">Students</option>
+                    <option value="technical">Technical Experts</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Writing Goals
+                  </label>
+                  <input 
+                    type="text"
+                    id="writing-goals"
+                    placeholder="e.g., clarity, persuasion, information"
+                    className="w-full p-3 border rounded-lg"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-6">
+                <label className="flex items-center">
+                  <input 
+                    type="checkbox"
+                    id="preserve-citations"
+                    defaultChecked={true}
+                    className="mr-2"
+                  />
+                  Preserve Citations
+                </label>
+                
+                <label className="flex items-center">
+                  <input 
+                    type="checkbox"
+                    id="improve-structure"
+                    defaultChecked={true}
+                    className="mr-2"
+                  />
+                  Improve Structure
+                </label>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h4 className="font-medium text-blue-900 mb-2">Preview</h4>
+                <div className="bg-white rounded border p-3 max-h-40 overflow-y-auto">
+                  <p className="text-sm text-gray-700 line-clamp-6">
+                    {selectedDraftForRewrite.content.substring(0, 300)}...
+                  </p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3">
+                <button 
+                  onClick={() => setSelectedDraftForRewrite(null)}
+                  className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    const context = {
+                      style: (document.getElementById('rewrite-style') as HTMLSelectElement)?.value,
+                      researchTopic: (document.getElementById('research-topic') as HTMLInputElement)?.value,
+                      targetAudience: (document.getElementById('target-audience') as HTMLSelectElement)?.value,
+                      writingGoals: (document.getElementById('writing-goals') as HTMLInputElement)?.value,
+                      preserveCitations: (document.getElementById('preserve-citations') as HTMLInputElement)?.checked,
+                      improveStructure: (document.getElementById('improve-structure') as HTMLInputElement)?.checked
+                    };
+                    applyContextualRewrite(context);
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  Apply Rewrite
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </Layout>
   );
 }
