@@ -1,111 +1,246 @@
-# Tabwise — Collaborative Research, Made Simple.
+# Concentra — Collaborative Research Platform
 
-Tabwise is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place.
+> **Concentra** (formerly Tabwise) is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place. Built with Next.js, Supabase, and Google Gemini AI.
+
+---
 
 ## Key Features
 
-- **Collaborative Research Sessions:** Create shared research sessions with your team, keeping all your resources in one place.
-- **AI-Powered Insights:** Automatically summarize articles, get key insights, and generate citations with built-in AI.
-- **Collaborative Drafting:** Write, edit, and comment on research drafts with your team in real-time.
-- **Team Management:** Organize your team, manage members, and control access to research sessions.
-- **Real-time Collaboration:** See who's online and what they are working on.
-- **Notifications:** Stay up-to-date with the latest activity in your research sessions.
-- **Dark/Light Mode:** Choose your preferred theme, which automatically syncs with your system preference.
-- **Export Your Work:** Export your research sessions and drafts to various formats for easy sharing and archiving.
+### Research & Collaboration
+- **Collaborative Research Sessions** — Create shared research sessions with your team, keeping all resources in one place
+- **AI-Powered Insights** — Automatically summarize articles, get key insights, and generate citations with built-in AI (Google Gemini)
+- **Collaborative Drafting** — Write, edit, and comment on research drafts with your team in real-time
+- **Real-time Collaboration** — See who's online and what they're working on via Supabase Realtime
+- **Team Management** — Organize your team, manage members, and control access to research sessions
+- **Notifications** — Stay up-to-date with the latest activity in your research sessions
 
-## Pages and Functionality
+### User Experience
+- **Dark/Light Mode** — Choose your preferred theme, automatically syncs with system preference
+- **Export Your Work** — Export research sessions and drafts to various formats for sharing and archiving
+- **Browser Extension** — Collect tabs and resources directly from Chrome
 
-### Landing Page
-
-The landing page provides a brief overview of Tabwise's features and benefits. It serves as the entry point for new and returning users, with clear calls-to-action to sign in or sign up.
-
-### Authentication
-
--   **Sign In (`/sign-in`):** Allows existing users to log in to their accounts.
--   **Sign Up (`/sign-up`):** Enables new users to create an account.
--   **Reset Password (`/reset-password`):** Provides a way for users to reset their password if they have forgotten it.
--   **Update Password (`/update-password`):** Allows logged-in users to change their password.
-
-### Core Application
-
--   **Dashboard (`/dashboard`):** The main hub for users after logging in. It displays recent activity, an overview of research sessions, and quick access to drafts.
--   **AI Research (`/ai/research/[id]`):** A powerful feature where users can leverage AI to analyze and get insights from their research materials within a specific session.
--   **Drafts (`/drafts`):** A list of all research drafts created by the user.
--   **Individual Draft (`/drafts/[id]`):** A collaborative editor for writing and editing a specific draft in real-time with team members.
--   **Notifications (`/notifications`):** Displays a feed of notifications related to research sessions, mentions, and other activities.
--   **Profile (`/profile`):** Allows users to view and manage their personal information.
--   **Research (`/research`):** A page to view and manage all research sessions.
--   **Collaboration Session (`/session/[id]`):** The main workspace for a research session. It includes features like AI chat, content management, and collaboration tools.
--   **Settings (`/settings`):** Users can customize their application preferences, such as theme and notification settings.
-
-### Teams
-
--   **Create Team (`/team/create`):** Allows users to create a new team and invite members.
--   **Team Dashboard (`/team/[id]`):** Provides an overview of a specific team, including members, research sessions, and activity.
--   **Team Research (`/team/research/[idr]`):** A dedicated space for teams to collaborate on research projects.
+---
 
 ## Tech Stack
 
-- **Framework:** [Next.js](https://nextjs.org/) (React)
-- **Styling:** [Tailwind CSS](https://tailwindcss.com/)
-- **Database:** [Supabase](https://supabase.io/) (PostgreSQL)
-- **Authentication:** [Supabase Auth](https://supabase.io/docs/guides/auth)
-- **AI:** [Google Gemini](https://ai.google.dev/)
+| Layer | Technology | Purpose |
+|-------|------------|---------|
+| **Framework** | Next.js 15 (App Router) | React framework with SSR/RSC |
+| **Styling** | Tailwind CSS | Utility-first CSS |
+| **Database** | Supabase (PostgreSQL) | Relational DB with realtime |
+| **Authentication** | Supabase Auth | Email/password, OAuth, magic links |
+| **AI** | Google Gemini | Article summarization, insights |
+| **Realtime** | Supabase Realtime | Live collaboration, presence |
+| **Language** | TypeScript | Type safety |
+
+---
+
+## Architecture
+
+```
+eyaya/
+├── src/
+│   ├── app/                    # Next.js App Router pages
+│   │   ├── (auth)/            # Auth pages (sign-in, sign-up, reset-password)
+│   │   ├── (dashboard)/       # Protected dashboard routes
+│   │   │   ├── dashboard/     # User dashboard
+│   │   │   ├── drafts/        # Draft management
+│   │   │   ├── research/      # Research sessions
+│   │   │   ├── session/[id]/  # Collaboration workspace
+│   │   │   ├── ai/research/   # AI-powered research
+│   │   │   ├── team/          # Team management
+│   │   │   ├── notifications/ # Notification feed
+│   │   │   ├── profile/       # User profile
+│   │   │   └── settings/      # User preferences
+│   │   ├── api/               # API routes
+│   │   └── layout.tsx         # Root layout with providers
+│   ├── components/            # Reusable UI components
+│   │   ├── ui/               # Base UI components (shadcn/ui style)
+│   │   ├── editor/           # Collaborative editor components
+│   │   ├── research/         # Research-specific components
+│   │   └── team/             # Team management components
+│   ├── lib/                   # Core utilities
+│   │   ├── supabase/         # Supabase client (browser & server)
+│   │   ├── ai/               # Google Gemini integration
+│   │   ├── utils.ts          # Helper functions
+│   │   └── validations.ts    # Zod schemas
+│   ├── hooks/                 # Custom React hooks
+│   │   ├── useRealtime.ts    # Supabase Realtime subscriptions
+│   │   ├── useAuth.ts        # Auth state management
+│   │   └── usePresence.ts    # User presence tracking
+│   ├── types/                 # TypeScript type definitions
+│   └── middleware.ts          # Auth middleware, route protection
+├── public/                    # Static assets
+├── supabase/                  # Supabase configuration
+│   ├── migrations/           # Database migrations
+│   └── seed.sql             # Seed data
+└── package.json
+```
+
+### Data Flow
+
+```
+User Action → Next.js Server Component → Supabase (PostgreSQL)
+                                    ↓
+                            Supabase Realtime → Connected Clients
+                                    ↓
+                            Google Gemini API → AI Insights
+```
+
+---
+
+## Pages & Functionality
+
+### Public Pages
+| Route | Description |
+|-------|-------------|
+| `/` | Landing page with feature overview |
+| `/sign-in` | Email/password + OAuth sign in |
+| `/sign-up` | Registration with email confirmation |
+| `/reset-password` | Password reset request |
+| `/update-password` | New password form |
+
+### Protected Pages (Auth Required)
+| Route | Description |
+|-------|-------------|
+| `/dashboard` | Main hub: recent activity, sessions, drafts |
+| `/drafts` | List all research drafts |
+| `/drafts/[id]` | Collaborative editor (TipTap + realtime) |
+| `/research` | Manage all research sessions |
+| `/session/[id]` | Workspace: AI chat, content, collaboration |
+| `/ai/research/[id]` | AI analysis of research materials |
+| `/team/create` | Create new team + invite members |
+| `/team/[id]` | Team dashboard: members, sessions, activity |
+| `/team/research/[idr]` | Team research collaboration |
+| `/notifications` | Activity feed with read/unread status |
+| `/profile` | User info, avatar, preferences |
+| `/settings` | Theme, notifications, account settings |
+
+---
 
 ## Getting Started
 
 ### Prerequisites
-
-- [Node.js](https://nodejs.org/en/) (v18 or later)
-- [npm](https://www.npmjs.com/)
-- A [Supabase](https://supabase.io/) project
+- Node.js 18+
+- npm/pnpm/yarn
+- Supabase project (free tier works)
+- Google AI Studio API key (for Gemini)
 
 ### Installation
 
-1.  **Clone the repository:**
+```bash
+# 1. Clone the repository
+git clone https://github.com/your-username/eyaya.git concentra
+cd concentra
 
-    ```bash
-    git clone https://github.com/your-username/gugel.git tabwise
-    cd tabwise
-    ```
+# 2. Install dependencies
+npm install
 
-2.  **Install dependencies:**
+# 3. Set up environment variables
+cp .env.example .env.local
+```
 
-    ```bash
-    npm install
-    ```
+### Environment Variables
 
-3.  **Set up environment variables:**
+```env
+# Supabase (get from Supabase Dashboard → Settings → API)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key  # Server-only!
 
-    Create a `.env.local` file in the root of your project and add your Supabase project URL and anon key:
+# Google Gemini AI (get from https://aistudio.google.com/)
+GEMINI_API_KEY=your-gemini-api-key
 
-    ```
-    NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-    NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
-    ```
+# Optional: Analytics, Sentry, etc.
+```
 
-4.  **Run the development server:**
+### Database Setup
 
-    ```bash
-    npm run dev
-    ```
+1. Go to Supabase Dashboard → SQL Editor
+2. Run migrations from `supabase/migrations/` in order
+3. (Optional) Run `supabase/seed.sql` for sample data
 
-    Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Development
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
+
+### Production Build
+
+```bash
+npm run build
+npm start
+```
+
+---
 
 ## Browser Extension
 
-Tabwise also comes with a browser extension to make it even easier to collect your tabs and resources.
+Concentra includes a Chrome extension for collecting research resources.
 
-### To install the extension:
+### Installation
+1. Navigate to `chrome://extensions`
+2. Enable "Developer mode"
+3. Click "Load unpacked" and select `src/apps/extension`
 
-1.  Navigate to `chrome://extensions` in your Chrome browser.
-2.  Enable "Developer mode".
-3.  Click "Load unpacked" and select the `src/apps/extension` directory from this project.
+---
 
-## Contributing
+## Security
 
-Contributions are welcome! Please feel free to submit a pull request or open an issue.
+- **Row Level Security (RLS)** — All tables protected by Supabase RLS policies
+- **Authentication** — Supabase Auth with email confirmation, OAuth providers
+- **API Keys** — Server-only keys in `.env.local`, never exposed to client
+- **Input Validation** — Zod schemas on all API routes
+- **Rate Limiting** — Supabase built-in + custom middleware
+
+---
+
+## Known Limitations
+
+| Limitation | Impact | Workaround |
+|------------|--------|------------|
+| **No offline support** | Requires internet connection | Export drafts for offline reading |
+| **Single-file exports** | No batch export of multiple sessions | Manual export per session |
+| **Gemini rate limits** | AI features may throttle on free tier | Cache responses, implement queues |
+| **No mobile app** | Web-only currently | PWA support planned |
+| **Basic search** | No full-text search across sessions | Use Supabase `pg_trgm` or Meilisearch |
+| **Limited file upload** | No native file storage integration | Use Supabase Storage bucket |
+
+---
+
+## CI/CD
+
+GitHub Actions runs daily at 06:00 UTC and on every push to `main`:
+- Install dependencies (`npm ci`)
+- Setup PostgreSQL (via Supabase local or Docker)
+- Run type checking (`tsc --noEmit`)
+- Run linting (`npm run lint`)
+- Run unit/integration tests
+- Build for production (`npm run build`)
+- Run collaboration anomaly checks (orphaned sessions, drafts without owners)
+- Report PASS / FAIL
+
+See `.github/workflows/ci.yml` for the pipeline configuration.
+
+---
+
+## Screenshots
+
+| Dashboard | Research Session | Collaborative Editor | Team Management |
+|-----------|------------------|---------------------|-----------------|
+| ![Dashboard](public/screenshots/Screenshot%202026-09-07%20115018.png) | ![Session](public/screenshots/Screenshot%202026-09-07%20115134.png) | ![Editor](public/screenshots/Screenshot%202026-09-07%20115152.png) | ![Team](public/screenshots/Screenshot%202026-09-07%20115208.png) |
+
+---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+## Support
+
+For issues and feature requests, please create an issue on GitHub.
