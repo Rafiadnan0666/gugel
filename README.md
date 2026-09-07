@@ -4,6 +4,24 @@
 
 ---
 
+## Table of Contents
+
+- [Key Features](#key-features)
+- [Screenshots](#screenshots)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Database Schema (ERD)](#database-schema-erd)
+- [Pages & Functionality](#pages--functionality)
+- [Getting Started](#getting-started)
+- [Browser Extension](#browser-extension)
+- [Security](#security)
+- [Known Limitations](#known-limitations)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [License](#license)
+- [Support](#support)
+
+---
+
 ## Key Features
 
 ### Research & Collaboration
@@ -18,6 +36,14 @@
 - **Dark/Light Mode** — Choose your preferred theme, automatically syncs with system preference
 - **Export Your Work** — Export research sessions and drafts to various formats for sharing and archiving
 - **Browser Extension** — Collect tabs and resources directly from Chrome
+
+---
+
+## Screenshots
+
+| Dashboard | Research Session | Collaborative Editor | Team Management |
+|-----------|------------------|---------------------|-----------------|
+| ![Dashboard](public/screenshots/dashboard.png) | ![Session](public/screenshots/research-session.png) | ![Editor](public/screenshots/collaborative-editor.png) | ![Team](public/screenshots/team-management.png) |
 
 ---
 
@@ -81,11 +107,86 @@ eyaya/
 
 ```
 User Action → Next.js Server Component → Supabase (PostgreSQL)
-                                    ↓
-                            Supabase Realtime → Connected Clients
-                                    ↓
-                            Google Gemini API → AI Insights
+                                     ↓
+                             Supabase Realtime → Connected Clients
+                                     ↓
+                             Google Gemini API → AI Insights
 ```
+
+---
+
+## Database Schema (ERD)
+
+See [ERD.md](ERD.md) for the complete Entity Relationship Diagram with Mermaid visualization.
+
+### Core Entities
+| Table | Primary Key | Foreign Keys | Description |
+|-------|-------------|--------------|-------------|
+| `profiles` | `id` (uuid) | References `auth.users.id` | User profiles with settings |
+| `settings` | `id` (uuid) | `user_id` → `profiles.id` | User preferences |
+| `research_sessions` | `id` (uuid) | `user_id`, `team_id` | Research project containers |
+| `drafts` | `id` (uuid) | `session_id`, `user_id` | Collaborative documents |
+| `tabs` | `id` (uuid) | `session_id`, `user_id` | Collected research sources |
+| `session_collaborators` | `id` (uuid) | `session_id`, `user_id` | Real-time collaboration |
+| `session_messages` | `id` (uuid) | `session_id`, `user_id` | Chat messages (user/AI) |
+| `summaries` | `id` (uuid) | `tab_id` | AI-generated summaries |
+| `comments` | `id` (uuid) | `draft_id`, `user_id` | Draft comments |
+
+### Team & Organization
+| Table | Primary Key | Foreign Keys | Description |
+|-------|-------------|--------------|-------------|
+| `teams` | `id` (uuid) | `owner_id` → `profiles.id` | Team workspaces |
+| `team_members` | `id` (uuid) | `team_id`, `user_id` | Team membership with roles |
+| `team_messages` | `id` (uuid) | `team_id`, `user_id` | Team chat |
+
+### AI & Analytics
+| Table | Primary Key | Foreign Keys | Description |
+|-------|-------------|--------------|-------------|
+| `ai_providers` | `id` (uuid) | - | AI service providers (Gemini, OpenAI, etc.) |
+| `ai_models` | `id` (uuid) | `provider_id` | Specific models per provider |
+| `ai_prompts` | `id` (uuid) | `user_id` | User prompts |
+| `ai_prompt_responses` | `id` (uuid) | `prompt_id`, `provider_id`, `model_id` | AI responses |
+| `ai_response_feedback` | `id` (uuid) | `response_id`, `user_id` | Quality ratings |
+| `ai_usage_logs` | `id` (uuid) | `user_id`, `provider_id`, `model_id`, `session_id` | Token usage tracking |
+| `aitrace` | `id` (uuid) | `user_id`, `session_id` | Detailed AI traces |
+
+### Billing & Payments
+| Table | Primary Key | Foreign Keys | Description |
+|-------|-------------|--------------|-------------|
+| `payment_gateways` | `id` (uuid) | - | Midtrans, Stripe, etc. |
+| `payment_customers` | `id` (uuid) | `user_id`, `gateway_id` | Gateway customer mappings |
+| `payments` | `id` (uuid) | `user_id`, `invoice_id`, `gateway_id` | Payment transactions |
+| `invoices` | `id` (uuid) | `user_id` | Billing invoices |
+| `invoice_items` | `id` (uuid) | `invoice_id` | Invoice line items |
+| `credit_ledger` | `id` (uuid) | `user_id`, `reference_id` | Credit transactions |
+| `user_credits` | `user_id` (uuid) | - | Current credit balance |
+
+### Auth & Access Control
+| Table | Primary Key | Foreign Keys | Description |
+|-------|-------------|--------------|-------------|
+| `user_roles` | `id` (uuid) | - | Role definitions |
+| `user_role_assignments` | `id` (uuid) | `user_id`, `role_id` | User-role mappings |
+| `role_ai_quotas` | `id` (uuid) | `role_id`, `provider_id` | Per-role AI limits |
+| `user_devices` | `id` (uuid) | `user_id` | Device tracking |
+
+### System
+| Table | Primary Key | Foreign Keys | Description |
+|-------|-------------|--------------|-------------|
+| `notifications` | `id` (bigint) | `user_id` | Notification feed |
+| `admin_actions` | `id` (uuid) | `admin_id` | Audit log |
+
+### Key Relationships
+
+1. **User → Research Sessions** (One-to-Many): Users own research sessions
+2. **Research Session → Drafts/Tabs/Messages** (One-to-Many): Sessions contain content
+3. **Research Session → Collaborators** (Many-to-Many): Real-time collaboration
+4. **Team → Members** (One-to-Many): Team membership with roles
+5. **Team → Research Sessions** (One-to-Many): Team-owned sessions
+6. **AI Provider → Models** (One-to-Many): Provider model catalog
+7. **AI Prompt → Responses** (One-to-Many): Prompt-response pairs
+8. **Payment Gateway → Customers/Payments** (One-to-Many): Payment processing
+9. **Invoice → Items/Payments** (One-to-Many): Billing details
+10. **User → Credit Ledger** (One-to-Many): Transaction history
 
 ---
 
@@ -130,7 +231,7 @@ User Action → Next.js Server Component → Supabase (PostgreSQL)
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/eyaya.git concentra
+git clone https://github.com/Rafiadnan0666/gugel.git concentra
 cd concentra
 
 # 2. Install dependencies
@@ -211,9 +312,10 @@ Concentra includes a Chrome extension for collecting research resources.
 
 ---
 
-## CI/CD
+## CI/CD Pipeline
 
 GitHub Actions runs daily at 06:00 UTC and on every push to `main`:
+
 - Install dependencies (`npm ci`)
 - Setup PostgreSQL (via Supabase local or Docker)
 - Run type checking (`tsc --noEmit`)
@@ -224,14 +326,6 @@ GitHub Actions runs daily at 06:00 UTC and on every push to `main`:
 - Report PASS / FAIL
 
 See `.github/workflows/ci.yml` for the pipeline configuration.
-
----
-
-## Screenshots
-
-| Dashboard | Research Session | Collaborative Editor | Team Management |
-|-----------|------------------|---------------------|-----------------|
-| ![Dashboard](public/screenshots/Screenshot%202026-09-07%20115018.png) | ![Session](public/screenshots/Screenshot%202026-09-07%20115134.png) | ![Editor](public/screenshots/Screenshot%202026-09-07%20115152.png) | ![Team](public/screenshots/Screenshot%202026-09-07%20115208.png) |
 
 ---
 
