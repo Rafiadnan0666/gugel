@@ -41,9 +41,26 @@
 
 ## Screenshots
 
-| Dashboard | Research Session | Collaborative Editor | Team Management |
-|-----------|------------------|---------------------|-----------------|
-| ![Dashboard](public/screenshots/dashboard.png) | ![Session](public/screenshots/research-session.png) | ![Editor](public/screenshots/collaborative-editor.png) | ![Team](public/screenshots/team-management.png) |
+<table>
+<tr>
+<td align="center" width="25%">
+<b>Dashboard</b><br>
+<img src="public/screenshots/dashboard.png" alt="Dashboard" width="350">
+</td>
+<td align="center" width="25%">
+<b>Research Session</b><br>
+<img src="public/screenshots/research-session.png" alt="Research Session" width="350">
+</td>
+<td align="center" width="25%">
+<b>Collaborative Editor</b><br>
+<img src="public/screenshots/collaborative-editor.png" alt="Collaborative Editor" width="350">
+</td>
+<td align="center" width="25%">
+<b>Team Management</b><br>
+<img src="public/screenshots/team-management.png" alt="Team Management" width="350">
+</td>
+</tr>
+</table>
 
 ---
 
