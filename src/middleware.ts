@@ -1,52 +1,26 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import createIntlMiddleware from 'next-intl/middleware';
-import { cookies } from 'next/headers';
-// import { createSupabaseServerClient } from '@/utils/supabase/server'
-
-const intlMiddleware = createIntlMiddleware({
-  locales: ['en', 'ur'], // Your supported locales
-  defaultLocale: 'en',
-});
 
 export async function middleware(request: NextRequest) {
-  const intlResponse = intlMiddleware(request);
-  const response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
-
-  const cookieStore = await cookies();
-
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
         get(name: string) {
-          return cookieStore.get(name)?.value;
+          return request.cookies.get(name)?.value;
         },
-        set(
-          name: string,
-          value: string,
-          options: {
-            path: string;
-            maxAge?: number;
-            domain?: string;
-            sameSite?: 'lax' | 'strict' | 'none';
-            secure?: boolean;
-          },
-        ) {
-          cookieStore.set({ name, value, ...options });
+        set(name: string, value: string, options: any) {
+          request.cookies.set({ name, value, ...options });
         },
-        remove(name: string, options: { path: string; domain?: string }) {
-          cookieStore.set({ name, value: '', ...options, maxAge: 0 });
+        remove(name: string, options: any) {
+          request.cookies.set({ name, value: '', ...options, maxAge: 0 });
         },
       },
-    },
+    }
   );
+
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -54,38 +28,45 @@ export async function middleware(request: NextRequest) {
   const url = request.nextUrl;
   const path = url.pathname;
 
-  if (path === '/') {
-    if (session) {
-      // If logged in, rewrite to the authenticated homepage without changing URL
-      return NextResponse.rewrite(new URL('/', request.url));
-    }else {
-      return NextResponse.rewrite(new URL('/', request.url));
-    }
-    // If not logged in, continue to show the default homepage (no action needed)
-  }
-
-  // If user is already authenticated and tries to access auth pages, redirect to dashboard
+  // Redirect authenticated users away from auth pages
   if (
     session &&
-    (path.startsWith('/sign-in') ||
-      path.startsWith('/sign-up') ||
-      path.startsWith('/reset-password'))
+    (path === '/sign-in' ||
+      path === '/sign-up' ||
+      path === '/reset-password' ||
+      path === '/update-password')
   ) {
-    url.pathname = '/dashboard';
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // Protect dashboard and admin routes
-  if (!session && (path.startsWith('/dashboard') || path.startsWith('/admin'))) {
-    url.pathname = '/sign-in';
-    return NextResponse.redirect(url);
+  // Redirect unauthenticated users from protected pages
+  if (!session && (path.startsWith('/dashboard') || path.startsWith('/admin') || path.startsWith('/research'))) {
+    return NextResponse.redirect(new URL('/sign-in', request.url));
   }
 
-  // Check admin access here if needed (you'll need to implement a way to identify admin users)
-  // This could be through a database lookup or checking user metadata
+  // Admin route protection
+  if (path.startsWith('/admin')) {
+    if (!session?.user) {
+      return NextResponse.redirect(new URL('/sign-in', request.url));
+    }
 
-  return response;
+    const { data: userRoles } = await supabase
+      .from('user_role_assignments')
+      .select('user_roles!inner(name)')
+      .eq('user_id', session.user.id);
+
+    const isAdmin = userRoles?.some((assignment: any) =>
+      assignment.user_roles.name === 'admin'
+    );
+
+    if (!isAdmin) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
+  }
+
+  return NextResponse.next();
 }
+
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/auth/callback|assets|.*\\..).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/|assets|.*\\..).*)'],
 };

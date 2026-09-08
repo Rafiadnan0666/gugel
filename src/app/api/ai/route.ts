@@ -2,24 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { WebScraper } from '@/lib/web-scraper';
-
-// This is a placeholder for a real generative AI model call.
-// In a real application, you would use an SDK from a provider like Google AI, OpenAI, etc.
-async function runGenerativeAI(prompt: string): Promise<string> {
-  console.log(`Running generative AI with prompt: ${prompt.substring(0, 100)}...`);
-  // Simulate a delay to mimic a real API call
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  
-  // In a real implementation, this would be a call to a generative model.
-  // For demonstration, we'll return a canned response based on the prompt.
-  if (prompt.startsWith('Summarize the following content:')) {
-    return 'This is a server-generated summary of the provided content. It is more robust than the previous on-device model.';
-  }
-  if (prompt.includes('User\'s question:')) {
-    return 'This is a server-generated response to your question. The AI chat is now powered by a server-side model.';
-  }
-  return 'This is a generic response from the server-side AI model.';
-}
+import { aiService } from '@/lib/ai-service';
+import { usageTracking } from '@/lib/usage-tracking';
 
 const webScraper = new WebScraper();
 
@@ -49,42 +33,96 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-try {
+  try {
+    // Check quota before processing
+    const quotaCheck = await usageTracking.checkQuota(user.id, 1000);
+    if (!quotaCheck.allowed) {
+      return NextResponse.json({
+        error: quotaCheck.warningMessage || 'Quota exceeded',
+        remainingTokens: quotaCheck.remainingTokens,
+      }, { status: 429 });
+    }
+
     let result;
+
     if (task === 'summarize-url') {
       const scrapingReport = await webScraper.scrapeWebsite(prompt);
       if (!scrapingReport.success || !scrapingReport.content) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Failed to fetch content from URL',
-          details: scrapingReport.errors 
+          details: scrapingReport.errors,
         }, { status: 500 });
       }
-      const summarizationPrompt = `Summarize the following content: ${scrapingReport.content.content.substring(0, 8000)}`;
-      result = await runGenerativeAI(summarizationPrompt);
-      // Include comprehensive data in the response
-      return NextResponse.json({ 
-        result, 
+
+      const aiResult = await aiService.generate(
+        `Provide a comprehensive summary of the following content. Highlight key points, main arguments, and important details:\n\n${scrapingReport.content.content.substring(0, 8000)}`,
+        { maxTokens: 800, userId: user.id }
+      );
+
+      return NextResponse.json({
+        result: aiResult.text,
         title: scrapingReport.content.title,
         metadata: scrapingReport.content.metadata,
         summary: scrapingReport.summary,
-        url: scrapingReport.content.url
+        url: scrapingReport.content.url,
+        usage: aiResult.usage,
       });
+
     } else if (task === 'analyze-url') {
       const scrapingReport = await webScraper.scrapeWebsite(prompt);
       if (!scrapingReport.success) {
-        return NextResponse.json({ 
+        return NextResponse.json({
           error: 'Failed to analyze URL',
-          details: scrapingReport.errors 
+          details: scrapingReport.errors,
         }, { status: 500 });
       }
-      return NextResponse.json({ report: scrapingReport });
+
+      const enhancedAnalysis = await webScraper.analyzeURLWithAI(prompt, scrapingReport.content!);
+
+      return NextResponse.json({
+        report: scrapingReport,
+        analysis: enhancedAnalysis,
+      });
+
+    } else if (task === 'chat') {
+      const aiResult = await aiService.generate(
+        prompt,
+        { maxTokens: 1000, userId: user.id }
+      );
+
+      return NextResponse.json({
+        result: aiResult.text,
+        usage: aiResult.usage,
+      });
+
+    } else if (task === 'enhance-content') {
+      const aiResult = await aiService.generate(
+        prompt,
+        { maxTokens: 1500, userId: user.id }
+      );
+
+      return NextResponse.json({
+        result: aiResult.text,
+        usage: aiResult.usage,
+      });
+
     } else {
-      result = await runGenerativeAI(prompt);
-      return NextResponse.json({ result });
+      // Generic AI task
+      const aiResult = await aiService.generate(
+        prompt,
+        { maxTokens: 1000, userId: user.id }
+      );
+
+      return NextResponse.json({
+        result: aiResult.text,
+        usage: aiResult.usage,
+      });
     }
 
   } catch (error) {
     console.error('Error processing AI request:', error);
-    return NextResponse.json({ error: 'Failed to process AI request' }, { status: 500 });
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Failed to process AI request',
+    }, { status: 500 });
   }
 }
