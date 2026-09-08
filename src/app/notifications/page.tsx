@@ -3,15 +3,17 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { INotification, IProfile } from '@/types/main.db';
-import { FiMail, FiBell, FiCheck, FiMessageSquare, FiThumbsUp, FiUserPlus, FiShare2 } from 'react-icons/fi';
+import type { Notification, Profile } from '@/types/main.db';
+import {
+  FiBell, FiInfo, FiDollarSign, FiActivity, FiUsers, FiZap,
+  FiMail, FiCheck, FiThumbsUp, FiUserPlus, FiShare2, FiMessageSquare
+} from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
-import Link from 'next/link';
 
 export default function Notifications() {
-  const [authUser, setAuthUser] = useState<IProfile | null>(null);
+  const [authUser, setAuthUser] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [notifications, setNotifications] = useState<INotification[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'unread'>('all');
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -31,6 +33,8 @@ export default function Notifications() {
         id: user.id,
         email: user.email ?? '',
         full_name: user.user_metadata?.full_name ?? '',
+        avatar_url: user.user_metadata?.avatar_url ?? null,
+        settings: user.user_metadata?.settings ?? null,
         created_at: new Date(user.created_at),
         updated_at: new Date(user.updated_at ?? new Date()),
       });
@@ -129,18 +133,12 @@ export default function Notifications() {
   };
 
   const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'message':
-        return <FiMessageSquare className="text-blue-500" />;
-      case 'like':
-        return <FiThumbsUp className="text-red-500" />;
-      case 'follow':
-        return <FiUserPlus className="text-green-500" />;
-      case 'mention':
-        return <FiShare2 className="text-purple-500" />;
-      default:
-        return <FiBell className="text-orange-500" />;
-    }
+    if (type?.startsWith('system_')) return <FiInfo className="w-5 h-5 text-blue-500" />;
+    if (type?.startsWith('billing_')) return <FiDollarSign className="w-5 h-5 text-green-500" />;
+    if (type?.startsWith('usage_')) return <FiActivity className="w-5 h-5 text-orange-500" />;
+    if (type?.startsWith('collaboration_')) return <FiUsers className="w-5 h-5 text-purple-500" />;
+    if (type?.startsWith('ai_')) return <FiZap className="w-5 h-5 text-cyan-500" />;
+    return <FiBell className="w-5 h-5 text-gray-500" />;
   };
 
   if (loading && page === 1) {

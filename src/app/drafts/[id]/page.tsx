@@ -5,12 +5,19 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import { useAIService } from '@/hooks/useAIService';
-import type { IDraft, IProfile, IResearchSession, IComment } from '@/types/main.db';
+import type { Draft, Profile, ResearchSession, Comment } from '@/types/main.db';
 import { exportToPDF } from '@/lib/pdf';
 
-interface IDraftWithResearchSession extends IDraft {
-  research_sessions: IResearchSession;
-  profiles?: IProfile;
+interface IDraftWithResearchSession extends Draft {
+  research_sessions: ResearchSession;
+  profiles?: Profile;
+}
+
+interface CommentWithProfile extends Comment {
+  profiles?: {
+    full_name: string;
+    avatar_url?: string;
+  };
 }
 
 
@@ -92,11 +99,11 @@ export default function DraftEditPage() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [comments, setComments] = useState<IComment[]>([]);
+  const [comments, setComments] = useState<CommentWithProfile[]>([]);
   const [user, setUser] = useState<any>(null);
   const [sidebarTab, setSidebarTab] = useState<'comments' | 'history' | 'collaborators' | 'ai' | 'templates'>('ai');
-  const [history, setHistory] = useState<IDraft[]>([]);
-  const [collaborators, setCollaborators] = useState<IProfile[]>([]);
+  const [history, setHistory] = useState<Draft[]>([]);
+  const [collaborators, setCollaborators] = useState<Profile[]>([]);
   const [showPDFModal, setShowPDFModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareLink, setShareLink] = useState('');
@@ -422,13 +429,13 @@ Frequently asked questions and answers...`
   }, [supabase, draftId]);
 
   const loadHistory = useCallback(async () => {
-    if (!draft?.research_session_id) return;
+      if (!draft?.session_id) return;
     
     try {
       const { data, error } = await supabase
         .from('drafts')
         .select('*')
-        .eq('research_session_id', draft.research_session_id)
+        .eq('session_id', draft.session_id)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -444,7 +451,7 @@ Frequently asked questions and answers...`
 
     const loadCollaborators = useCallback(async () => {
 
-      if (!draft?.research_session_id) return;
+if (!draft?.session_id) return;
 
       
 
@@ -478,7 +485,7 @@ Frequently asked questions and answers...`
 
           `)
 
-          .eq('session_id', draft.research_session_id);
+          .eq('session_id', draft.session_id);
 
   
 
@@ -500,7 +507,7 @@ Frequently asked questions and answers...`
 
             .filter(Boolean);
 
-          setCollaborators(collaboratorProfiles.flat() as IProfile[]);
+          setCollaborators(collaboratorProfiles.flat() as Profile[]);
 
         }
 
@@ -668,7 +675,7 @@ Frequently asked questions and answers...`
     
     const shareToken = btoa(JSON.stringify({
       draftId: draft.id,
-      sessionId: draft.research_session_id,
+      sessionId: draft.session_id,
       expires: Date.now() + 7 * 24 * 60 * 60 * 1000
     }));
     

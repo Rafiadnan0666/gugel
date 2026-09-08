@@ -7,27 +7,25 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { IProfile, IDraft } from '@/types/main.db';
-import { FiEdit2, FiExternalLink } from 'react-icons/fi';
-
-interface EditProfileState {
-  full_name: string;
-  avatar_url: string;
-  email: string;
-  settings: Record<string, any>;
-}
+import type { Profile, Draft } from '@/types/main.db';
+import { FiEdit2, FiCalendar, FiFileText, FiSettings, FiMail, FiUser, FiMapPin, FiLink, FiCamera, FiSave, FiX } from 'react-icons/fi';
 
 export default function ProfilePage() {
   /* ────────────────────────────────
    * STATE
    * ────────────────────────────── */
-  const [authUser, setAuthUser] = useState<IProfile | null>(null);
-  const [profile, setProfile] = useState<IProfile | null>(null);
-  const [drafts, setDrafts] = useState<IDraft[]>([]);
+  const [authUser, setAuthUser] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editState, setEditState] = useState<EditProfileState>({
+  const [editState, setEditState] = useState<{
+    full_name: string;
+    avatar_url: string;
+    email: string;
+    settings: any;
+  }>({
     full_name: '',
     avatar_url: '',
     email: '',
@@ -59,6 +57,8 @@ setAuthUser({
   id: user.id,
   email: user.email ?? '',
   full_name: user.user_metadata?.full_name ?? '',
+  avatar_url: user.user_metadata?.avatar_url ?? null,
+  settings: user.user_metadata?.settings ?? null,
   created_at: new Date(user.created_at),
   updated_at: new Date(user.updated_at ?? new Date()),
 });
@@ -82,7 +82,7 @@ setAuthUser({
         .single();
 
       if (profileErr) throw profileErr;
-      setProfile(profileData as IProfile);
+      setProfile(profileData as Profile);
 
       // Fetch drafts written by the user
       const { data: draftsData, error: draftsErr } = await supabase

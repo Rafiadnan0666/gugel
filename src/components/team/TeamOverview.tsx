@@ -1,13 +1,13 @@
 'use client';
 
-import { FiFileText, FiUsers, FiMessageSquare, FiActivity, FiPlus } from 'react-icons/fi';
-import type { IResearchSession, ITeamMember, ITeamMessage, PresenceUser, AnalyticsData } from '@/types/main.db';
 import { useRouter } from 'next/navigation';
+import { FiFileText, FiUsers, FiMessageSquare, FiActivity, FiPlus } from 'react-icons/fi';
+import type { ResearchSession, TeamMember, TeamMessage, PresenceUser, AnalyticsData } from '@/types/main.db';
 
 interface TeamOverviewProps {
-  sessions: IResearchSession[];
-  teamMembers: ITeamMember[];
-  teamMessages: ITeamMessage[];
+  sessions: ResearchSession[];
+  teamMembers: TeamMember[];
+  teamMessages: TeamMessage[];
   presenceUsers: PresenceUser[];
   analyticsData: AnalyticsData | null;
   createNewSession: () => void;

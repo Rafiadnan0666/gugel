@@ -7,15 +7,11 @@ interface LanguageModelSession {
   destroy?: () => void;
 }
 
-interface LanguageModelStatic {
-  availability: (opts: LanguageModelOptions) => Promise<string>;
-  create: (opts: LanguageModelOptions & { monitor?: (m: any) => void }) => Promise<LanguageModelSession>;
-}
-
 declare global {
-  interface Window {
-    LanguageModelAI?: LanguageModelStatic;
-  }
+  var LanguageModel: {
+    availability: (opts: LanguageModelOptions) => Promise<string>;
+    create: (opts: LanguageModelOptions & { monitor?: (m: any) => void }) => Promise<LanguageModelSession>;
+  } | undefined;
 }
 
 class LanguageModelService {
@@ -34,22 +30,22 @@ class LanguageModelService {
 
   private async _initialize(): Promise<void> {
     try {
-      if (!window.LanguageModelAI) {
+      if (typeof LanguageModel === 'undefined') {
         throw new Error('LanguageModel API is not available');
       }
 
-      const opts = {
+      const opts: LanguageModelOptions = {
         expectedOutputs: [{ type: 'text', languages: ['en'] }]
       };
 
-      const availability = await window.LanguageModelAI.availability(opts);
+      const availability = await LanguageModel.availability(opts);
       console.log('LanguageModel availability:', availability);
 
       if (availability === 'unavailable') {
         throw new Error('LanguageModel is unavailable');
       }
 
-      this.session = await window.LanguageModelAI.create({
+      this.session = await LanguageModel.create({
         ...opts,
         monitor(m: any) {
           m.addEventListener('downloadprogress', (e: any) => {
@@ -61,7 +57,7 @@ class LanguageModelService {
         }
       });
 
-      console.log('LanguageModel session ready:', this.session);
+      console.log('LanguageModel session ready');
     } catch (error) {
       console.error('Failed to initialize LanguageModel:', error);
       throw error;
@@ -72,7 +68,7 @@ class LanguageModelService {
 
   async prompt(text: string): Promise<string> {
     await this.initialize();
-    
+
     if (!this.session) {
       throw new Error('LanguageModel session is not initialized');
     }
@@ -92,7 +88,6 @@ class LanguageModelService {
 ${content}
 
 Summary:`;
-    
     return this.prompt(prompt);
   }
 
@@ -116,13 +111,12 @@ Key Points:
 - [point 3]`;
 
     const response = await this.prompt(prompt);
-    
-    // Parse the response
+
     const lines = response.split('\n');
     let title = '';
     let summary = '';
     const keyPoints: string[] = [];
-    
+
     let currentSection = '';
     for (const line of lines) {
       if (line.startsWith('Title:')) {
@@ -155,7 +149,6 @@ Key Points:
 Content: ${content}
 
 Enhanced version:`;
-
     return this.prompt(prompt);
   }
 
@@ -167,14 +160,13 @@ ${content}
 Key Insights:`;
 
     const response = await this.prompt(prompt);
-    
-    // Extract bullet points
+
     const lines = response.split('\n');
     const insights: string[] = [];
-    
+
     for (const line of lines) {
-      if (line.startsWith('-') || line.startsWith('•') || line.match(/^\d+\./)) {
-        insights.push(line.replace(/^[-•\d.]\s*/, '').trim());
+      if (line.startsWith('-') || line.startsWith('\u2022') || line.match(/^\d+\./)) {
+        insights.push(line.replace(/^[-\u2022\d.]\s*/, '').trim());
       }
     }
 
@@ -183,13 +175,13 @@ Key Insights:`;
 
   async isAvailable(): Promise<boolean> {
     try {
-      if (!window.LanguageModelAI) return false;
-      
-      const opts = {
+      if (typeof LanguageModel === 'undefined') return false;
+
+      const opts: LanguageModelOptions = {
         expectedOutputs: [{ type: 'text', languages: ['en'] }]
       };
-      
-      const availability = await window.LanguageModelAI.availability(opts);
+
+      const availability = await LanguageModel.availability(opts);
       return availability !== 'unavailable';
     } catch {
       return false;

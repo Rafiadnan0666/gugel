@@ -73,37 +73,8 @@ export interface EnhancedAnalysis {
   researchValue: 'high' | 'medium' | 'low';
   suggestedTags: string[];
   relatedTopics: string[];
-  sourceType: 'academic' | 'news' | 'blog' | 'documentation' | 'ecommerce' | 'government' | 'other';
-  readingDifficulty: 'easy' | 'medium' | 'hard';
-  biasAnalysis: {
-    politicalLean?: 'left' | 'center' | 'right' | 'unknown';
-    biasLevel: 'low' | 'medium' | 'high';
-    emotionalTone: 'neutral' | 'positive' | 'negative';
-    objectivityScore: number;
-  };
-  factCheckResults: {
-    claims: string[];
-    verifiability: 'high' | 'medium' | 'low';
-    sourcesMentioned: number;
-    citationsFound: boolean;
-  };
-  contentQuality: {
-    depthScore: number;
-    accuracyScore: number;
-    uniquenessScore: number;
-    timestamp: string;
-  };
-  recommendations: string[];
-}
-
-export interface EnhancedAnalysis {
-  credibilityScore: number;
-  relevanceScore: number;
-  keyInsights: string[];
-  researchValue: 'high' | 'medium' | 'low';
-  suggestedTags: string[];
-  relatedTopics: string[];
-  sourceType: 'academic' | 'news' | 'blog' | 'documentation' | 'ecommerce' | 'government' | 'other';
+  sourceType: 'academic' | 'journal' | 'news' | 'blog' | 'documentation' | 'ecommerce' | 'government' | 'other';
+  isPeerReviewed: boolean;
   readingDifficulty: 'easy' | 'medium' | 'hard';
   biasAnalysis: {
     politicalLean?: 'left' | 'center' | 'right' | 'unknown';
@@ -689,6 +660,7 @@ export class WebScraper {
       suggestedTags: [],
       relatedTopics: [],
       sourceType: 'other',
+      isPeerReviewed: false,
       readingDifficulty: 'medium',
       biasAnalysis: {
         politicalLean: 'unknown',
@@ -713,6 +685,9 @@ export class WebScraper {
 
     // 1. Determine source type
     analysis.sourceType = this.determineSourceType(content, url);
+
+    // 2. Check for peer review indicators
+    analysis.isPeerReviewed = this.checkPeerReview(content, url, analysis.sourceType);
 
     // 2. Calculate credibility score
     analysis.credibilityScore = this.calculateCredibilityScore(content, url);
@@ -749,15 +724,39 @@ export class WebScraper {
 
   private determineSourceType(content: ScrapedContent, url: string): EnhancedAnalysis['sourceType'] {
     const domain = new URL(url).hostname.toLowerCase();
+    const contentLower = content.content.toLowerCase();
+    
+    // Journal sources - check for peer-reviewed indicators
+    const journalDomains = [
+      'scholar.google', 'pubmed', 'ncbi', 'sciencedirect', 'springer', 'wiley',
+      'tandfonline', 'jstor', 'nature.com', 'science.org', 'cell.com', 'plos',
+      'frontiersin', 'mdpi', 'arxiv', 'biorxiv', 'ssrn', 'researchgate',
+      'academic.oup', 'journals.sagepub', 'bmj.com', 'thelancet', 'nejm'
+    ];
+    
+    if (journalDomains.some(d => domain.includes(d))) {
+      return 'journal';
+    }
+    
+    const journalIndicators = [
+      'doi:', 'issn', 'peer-reviewed', 'peer reviewed', 'journal of',
+      'volume', 'issue', 'pp.', 'abstract', 'methodology', 'references',
+      'citation', 'bibliography', 'literature review', 'systematic review'
+    ];
+    
+    const journalMatchCount = journalIndicators.filter(ind => contentLower.includes(ind)).length;
+    if (journalMatchCount >= 3) {
+      return 'journal';
+    }
     
     // Government sources
-    if (domain.includes('.gov') || domain.includes('.edu')) {
+    if (domain.includes('.gov')) {
       return 'government';
     }
     
-    // Academic sources
-    if (domain.includes('.edu') || domain.includes('academic') || domain.includes('journal') || 
-        domain.includes('research') || content.metadata.author?.includes('PhD') ||
+    // Academic sources (education institutions, research papers)
+    if (domain.includes('.edu') || domain.includes('academic') || 
+        content.metadata.author?.includes('PhD') ||
         content.metadata.author?.includes('Dr.')) {
       return 'academic';
     }
@@ -783,11 +782,35 @@ export class WebScraper {
     
     // Blog
     if (domain.includes('blog') || domain.includes('medium') || domain.includes('substack') ||
-        content.metadata.author && !domain.includes('news')) {
+        (content.metadata.author && !domain.includes('news'))) {
       return 'blog';
     }
     
     return 'other';
+  }
+
+  private checkPeerReview(content: ScrapedContent, url: string, sourceType: string): boolean {
+    const contentLower = content.content.toLowerCase();
+    
+    // Journal sources on known peer-review platforms are likely peer-reviewed
+    const peerReviewPlatforms = [
+      'pubmed', 'sciencedirect', 'springer', 'wiley', 'tandfonline',
+      'nature.com', 'science.org', 'cell.com', 'plos', 'frontiersin',
+      'nejm', 'thelancet', 'bmj.com'
+    ];
+    const domain = new URL(url).hostname.toLowerCase();
+    if (peerReviewPlatforms.some(p => domain.includes(p))) {
+      return true;
+    }
+    
+    // Check for peer-review indicators in content
+    const peerReviewIndicators = [
+      'peer-reviewed', 'peer reviewed', 'refereed', 'peer review process',
+      'accepted manuscript', 'revised manuscript', 'editorial review',
+      'double-blind review', 'single-blind review'
+    ];
+    
+    return peerReviewIndicators.some(ind => contentLower.includes(ind));
   }
 
   private calculateCredibilityScore(content: ScrapedContent, url: string): number {
@@ -796,12 +819,16 @@ export class WebScraper {
     const domain = new URL(url).hostname.toLowerCase();
     
     // Domain reputation (+20 for reputable sources)
-    if (domain.includes('.gov') || domain.includes('.edu')) {
+    if (domain.includes('.gov')) {
       score += 25;
+    } else if (domain.includes('.edu')) {
+      score += 20;
     } else if (domain.includes('.org')) {
       score += 15;
     } else if (this.isReputableNewsSource(domain)) {
       score += 20;
+    } else if (this.isJournalSource(domain)) {
+      score += 30;
     }
     
     // Author information (+15)
@@ -847,6 +874,16 @@ export class WebScraper {
     ];
     
     return reputableSources.some(source => domain.includes(source));
+  }
+
+  private isJournalSource(domain: string): boolean {
+    const journalSources = [
+      'scholar.google', 'pubmed', 'ncbi', 'sciencedirect', 'springer', 'wiley',
+      'tandfonline', 'jstor', 'nature.com', 'science.org', 'cell.com', 'plos',
+      'frontiersin', 'mdpi', 'arxiv', 'biorxiv', 'ssrn', 'researchgate',
+      'academic.oup', 'journals.sagepub', 'bmj.com', 'thelancet', 'nejm'
+    ];
+    return journalSources.some(source => domain.includes(source));
   }
 
   private hasCitations(content: ScrapedContent): boolean {
@@ -929,6 +966,7 @@ export class WebScraper {
     
     // Source type value
     const sourceTypeScores = {
+      journal: 35,
       academic: 30,
       government: 25,
       news: 20,

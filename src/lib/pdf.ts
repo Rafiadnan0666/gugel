@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import { IDraft } from '@/types/main.db';
+import { Draft } from '@/types/main.db';
 
 interface ITab {
   title: string;
@@ -80,7 +80,7 @@ const addReferences = (doc: jsPDF, tabs: ITab[]) => {
 
 export const exportToPDF = async (
   template: string,
-  draft: IDraft & { research_sessions: { title: string } },
+  draft: Draft & { research_sessions: { title: string } },
   tabs: ITab[]
 ) => {
   const doc = new jsPDF();

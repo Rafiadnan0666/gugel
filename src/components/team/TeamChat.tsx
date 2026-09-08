@@ -1,13 +1,13 @@
 'use client';
 
-import { FiSend, FiUsers } from 'react-icons/fi';
-import type { ITeamMessage, PresenceUser, IProfile } from '@/types/main.db';
 import { useRef, useEffect } from 'react';
+import { FiSend, FiUsers } from 'react-icons/fi';
+import type { TeamMessage, PresenceUser, Profile } from '@/types/main.db';
 
 interface TeamChatProps {
-  teamMessages: ITeamMessage[];
+  teamMessages: TeamMessage[];
   presenceUsers: PresenceUser[];
-  userProfile: IProfile | null;
+  userProfile: Profile | null;
   newMessage: string;
   setNewMessage: (message: string) => void;
   sendMessage: () => void;

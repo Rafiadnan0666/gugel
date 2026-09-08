@@ -1,13 +1,13 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import type { INotification } from '@/types/main.db';
+import type { Notification } from '@/types/main.db';
 import { FiBell } from 'react-icons/fi';
 import Link from 'next/link';
 import { formatDistanceToNow } from 'date-fns';
 
 export default function NotificationBell() {
-  const [notifications, setNotifications] = useState<INotification[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const supabase = createClient();
@@ -87,7 +87,7 @@ export default function NotificationBell() {
             ) : (
               notifications.map(notification => (
                 <div key={notification.id} className={`p-4 border-b border-gray-100 ${!notification.read ? 'bg-blue-50' : ''}`}>
-                  <Link href={notification.url || '/notifications'}>
+                  <Link href="/notifications">
                     <div className="text-sm text-gray-800">{notification.message}</div>
                     <div className="text-xs text-gray-500 mt-1">
                       {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}

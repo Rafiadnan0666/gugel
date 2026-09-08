@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import type { ISessionMessage, ITab, IDraft } from '@/types/main.db';
+import type { SessionMessage, Tab, Draft } from '@/types/main.db';
 import AIResponse from '@/components/AIResponse';
 import { FiSend } from 'react-icons/fi';
 import useChromeAI from '@/hooks/useChromeAI';
@@ -16,10 +16,10 @@ const suggestions = [
 ];
 
 const AIChat: React.FC<{
-  messages: ISessionMessage[];
+  messages: SessionMessage[];
   onSendMessage: (content: string) => void;
   isLoading: boolean;
-  researchContext: { tabs: ITab[]; drafts: IDraft[] };
+  researchContext: { tabs: Tab[]; drafts: Draft[] };
 }> = ({ messages, onSendMessage, isLoading, researchContext }) => {
   const [input, setInput] = useState('');
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>(suggestions);

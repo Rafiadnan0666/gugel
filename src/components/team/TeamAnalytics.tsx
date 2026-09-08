@@ -1,12 +1,16 @@
 'use client';
 
-import type { AnalyticsData, ITeamMember, ITeamMessage } from '@/types/main.db';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import type { AnalyticsData, TeamMember, TeamMessage, Profile } from '@/types/main.db';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+
+interface TeamMemberWithProfile extends TeamMember {
+  profiles?: Profile;
+}
 
 interface TeamAnalyticsProps {
   analyticsData: AnalyticsData | null;
-  teamMembers: ITeamMember[];
-  teamMessages: ITeamMessage[];
+  teamMembers: TeamMemberWithProfile[];
+  teamMessages: TeamMessage[];
 }
 
 export default function TeamAnalytics({ analyticsData, teamMembers, teamMessages }: TeamAnalyticsProps) {

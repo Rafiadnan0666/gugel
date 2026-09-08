@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import jsPDF from 'jspdf';
 
 interface ExportSection {
   title: string;
@@ -35,6 +36,15 @@ export async function POST(request: Request) {
       error: 'Content is required and must be a string' 
     }, { status: 400 });
   }
+
+  if (content.length > 500000) {
+    return NextResponse.json({
+      error: 'Content exceeds maximum size limit (500KB)'
+    }, { status: 400 });
+  }
+
+  const validTemplates = ['academic', 'research', 'simple', 'comprehensive'];
+  const normalizedTemplate = validTemplates.includes(template) ? template : 'comprehensive';
 
   const cookieStore = await cookies();
   const supabase = createServerClient(
@@ -84,15 +94,15 @@ export async function POST(request: Request) {
     }
 
     // Step 3: Apply template formatting
-    const formattedContent = applyTemplate(processedContent, template, sources, includeSources);
+    const formattedContent = applyTemplate(processedContent, normalizedTemplate, sources, includeSources);
 
     // Step 4: Generate PDF
-    const pdfResult = await generatePDFFromContent(formattedContent, template, user.id);
+    const pdfResult = await generatePDFFromContent(formattedContent, normalizedTemplate, user.id);
 
     // Step 5: Create export record
     const exportRecord = {
       user_id: user.id,
-      template,
+      template: normalizedTemplate,
       word_count: processedContent.split(/\s+/).length,
       include_sources: includeSources,
       batch_processing: batchProcessing,
@@ -108,7 +118,7 @@ export async function POST(request: Request) {
       success: true,
       pdf_url: pdfResult.url,
       metadata: {
-        template,
+        template: normalizedTemplate,
         word_count: processedContent.split(/\s+/).length,
         processing_time: Date.now() - startTime,
         sources_included: includeSources,
@@ -117,7 +127,7 @@ export async function POST(request: Request) {
       analysis: {
         plagiarism: plagiarismResult,
         batch_processing: batchResults,
-        template_applied: template
+        template_applied: normalizedTemplate
       }
     });
 
@@ -449,21 +459,60 @@ function formatComprehensiveReferences(sources: any[]): string {
   }).join('\n\n');
 }
 
-// PDF generation function (placeholder - would use a real PDF library)
+// PDF generation function using jsPDF
 async function generatePDFFromContent(content: string, template: string, userId: string): Promise<{url: string, size: number}> {
-  // This would use a library like puppeteer, jsPDF, or a PDF generation service
-  // For now, we'll simulate PDF generation
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 15;
+  const maxWidth = pageWidth - margin * 2;
   
-  const pdfUrl = `exports/${userId}/${Date.now()}-${template}.pdf`;
-  const size = content.length; // Approximate size in bytes
+  // Header
+  doc.setFontSize(9);
+  doc.setTextColor(150);
+  const title = template.charAt(0).toUpperCase() + template.slice(1) + ' Export';
+  doc.text(title, pageWidth / 2, 10, { align: 'center' });
   
-  // In a real implementation:
-  // 1. Generate PDF using a library
-  // 2. Save to cloud storage
-  // 3. Return the URL
+  // Title page content
+  doc.setFontSize(10);
+  doc.setTextColor(0);
+  
+  const lines = doc.splitTextToSize(content, maxWidth);
+  let y = 20;
+  
+  for (const line of lines) {
+    if (y > pageHeight - 20) {
+      doc.addPage();
+      doc.setFontSize(9);
+      doc.setTextColor(150);
+      doc.text(title, pageWidth / 2, 10, { align: 'center' });
+      doc.setFontSize(10);
+      doc.setTextColor(0);
+      y = 20;
+    }
+    doc.text(line, margin, y);
+    y += 5;
+  }
+  
+  // Footer with page numbers
+  const pageCount = (doc.internal as any).getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150);
+    doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 8, { align: 'center' });
+  }
+  
+  // Generate PDF buffer
+  const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+  const size = pdfBuffer.length;
+  
+  // Return as base64 data URL for direct download
+  const base64 = pdfBuffer.toString('base64');
+  const dataUrl = `data:application/pdf;base64,${base64}`;
   
   return {
-    url: pdfUrl,
+    url: dataUrl,
     size
   };
 }

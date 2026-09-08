@@ -3,25 +3,21 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { ITeam, ITeamMember, IProfile } from '@/types/main.db';
-import { 
-  FiPlus, FiUsers, FiUser, 
-  FiChevronRight, FiGlobe, FiLock,
-  FiX, FiSettings, FiAlertCircle
-} from 'react-icons/fi';
+import type { Team, TeamMember, Profile } from '@/types/main.db';
+import { FiPlus, FiAlertCircle, FiX, FiLock, FiGlobe, FiSettings, FiChevronRight, FiUsers, FiUser } from 'react-icons/fi';
 
 // Extended interface to include joined team data
-interface ITeamMemberWithTeam extends ITeamMember {
-  teams: ITeam;
+interface ITeamMemberWithTeam extends TeamMember {
+  teams: Team;
 }
 
 export default function CreateTeamPage() {
   const router = useRouter();
   const supabase = createClient();
   
-  const [userTeams, setUserTeams] = useState<ITeam[]>([]);
+  const [userTeams, setUserTeams] = useState<Team[]>([]);
   const [userMemberships, setUserMemberships] = useState<ITeamMemberWithTeam[]>([]);
-  const [userProfile, setUserProfile] = useState<IProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newTeamData, setNewTeamData] = useState({

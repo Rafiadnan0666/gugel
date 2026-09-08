@@ -1,11 +1,11 @@
 'use client';
 
-import { FiFileText } from 'react-icons/fi';
-import type { IResearchSession } from '@/types/main.db';
 import { useRouter } from 'next/navigation';
+import { FiFileText } from 'react-icons/fi';
+import type { ResearchSession } from '@/types/main.db';
 
 interface TeamSessionsProps {
-  sessions: IResearchSession[];
+  sessions: ResearchSession[];
   createNewSession: () => void;
 }
 

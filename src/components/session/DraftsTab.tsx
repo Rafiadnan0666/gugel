@@ -1,16 +1,16 @@
 'use client';
 
 import { FiZap, FiSave, FiMaximize, FiEye, FiEdit2 } from 'react-icons/fi';
-import type { IDraft, IProfile } from '@/types/main.db';
+import type { Draft, Profile } from '@/types/main.db';
 import { ProEditor } from '@/components/editor/ProEditor';
 
 interface DraftsTabProps {
   tabs: any[]; // Simplified for now
-  drafts: IDraft[];
+  drafts: Draft[];
   currentDraft: string;
   aiGeneratedDrafts: string[];
   sessionPermissions: 'owner' | 'editor' | 'viewer';
-  userProfile: IProfile | null;
+  userProfile: Profile | null;
   onlineUsers: any[];
   onGenerateAIDraft: () => void;
   onSaveDraft: () => void;

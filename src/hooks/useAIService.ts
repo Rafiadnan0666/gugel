@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import type { ITab, IDraft } from '@/types/main.db';
+import type { Tab, Draft } from '@/types/main.db';
 import { tabSummarizer } from '@/lib/tab-summarizer';
 
 export const useAIService = () => {
@@ -231,7 +231,7 @@ Provide the analysis in a structured JSON format.`;
     return await promptAI(prompt, 'assess-quality');
   };
 
-  const chatWithAI = async (message: string, context: { tabs: ITab[], drafts: IDraft[] }) => {
+  const chatWithAI = async (message: string, context: { tabs: Tab[], drafts: Draft[] }) => {
     const contextSummary = `The user has ${context.tabs.length} research tabs and ${context.drafts.length} drafts.`;
     const prompt = `${contextSummary}\n\nUser's question: ${message}`;
     return await promptAI(prompt, 'chat', context);

@@ -1,11 +1,11 @@
 'use client';
 
 import { FiUsers, FiWifi, FiWifiOff, FiRefreshCw, FiUserPlus } from 'react-icons/fi';
-import type { ITeam, ITeamMember, PresenceUser } from '@/types/main.db';
+import type { Team, TeamMember, PresenceUser } from '@/types/main.db';
 
 interface TeamHeaderProps {
-  team: ITeam;
-  teamMembers: ITeamMember[];
+  team: Team;
+  teamMembers: TeamMember[];
   presenceUsers: PresenceUser[];
   isOnline: boolean;
   lastSync: Date;

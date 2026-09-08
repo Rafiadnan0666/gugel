@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import type { PresenceUser, IProfile } from '@/types/main.db';
+import type { PresenceUser, Profile } from '@/types/main.db';
 
 export const useRealTimePresence = (draftId: string) => {
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
@@ -17,14 +17,9 @@ export const useRealTimePresence = (draftId: string) => {
       // Add user to presence
       const userPresence: PresenceUser = {
         user_id: user.id,
-        profile: {
-          id: user.id,
-          email: user.email!,
-          full_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
-          avatar_url: user.user_metadata?.avatar_url || '',
-          created_at: new Date(),
-          updated_at: new Date()
-        },
+        name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+        avatar_url: user.user_metadata?.avatar_url || '',
+        online_at: new Date(),
         last_seen: new Date(),
         status: 'online'
       };
@@ -43,7 +38,9 @@ export const useRealTimePresence = (draftId: string) => {
           
           const presenceData: PresenceUser[] = users.map((user: any) => ({
             user_id: user.user_id,
-            profile: user.profile,
+            name: user.profile?.full_name || 'User',
+            avatar_url: user.profile?.avatar_url || null,
+            online_at: new Date(),
             last_seen: new Date(),
             status: 'online'
           }));

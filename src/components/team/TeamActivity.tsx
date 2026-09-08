@@ -20,19 +20,19 @@ export default function TeamActivity({ events }: TeamActivityProps) {
           <div key={index} className="p-2 text-sm border-b last:border-b-0">
             <div className="flex items-center space-x-2">
               <span className="text-blue-500">
-                {event.type === 'message_sent' && <FiMessageSquare />}
-                {event.type === 'member_joined' && <FiUserPlus />}
-                {event.type === 'session_created' && <FiFileText />}
+                {event.type === 'message' && <FiMessageSquare />}
+                {event.type === 'user_join' && <FiUserPlus />}
+                {event.type === 'draft_update' && <FiFileText />}
               </span>
               <span className="font-medium">{event.user?.full_name}</span>
               <span className="text-gray-500 text-xs">
-                {event.timestamp.toLocaleTimeString()}
+                {event.timestamp?.toLocaleTimeString() || new Date(event.created_at).toLocaleTimeString()}
               </span>
             </div>
             <p className="text-gray-600 truncate">
-              {event.type === 'message_sent' && 'sent a message'}
-              {event.type === 'member_joined' && 'joined the team'}
-              {event.type === 'session_created' && 'created a session'}
+              {event.type === 'message' && 'sent a message'}
+              {event.type === 'user_join' && 'joined the team'}
+              {event.type === 'draft_update' && 'updated a draft'}
             </p>
           </div>
         ))}

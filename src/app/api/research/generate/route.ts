@@ -40,27 +40,35 @@ export async function POST(request: Request) {
   }
 
   try {
-    const engine = new ResearchPaperEngine(user.id);
+    const { aiService } = await import('@/lib/ai-service');
+    const engine = new ResearchPaperEngine(config, aiService as any);
 
     // Set up progress tracking
     let lastProgress = '';
-    engine.setProgressCallback((section, progress, status) => {
+    engine.onProgress = (section, progress, status) => {
       lastProgress = JSON.stringify({ section, progress, status });
-    });
+    };
 
-    const paper = await engine.generatePaper(config);
+    await engine.generatePaper();
+    const paper = engine.getPaper();
     const stats = engine.getStats();
+
+    if (!paper) {
+      return NextResponse.json({ error: 'Failed to generate paper' }, { status: 500 });
+    }
+
+    const totalWordCount = paper.sections.reduce((sum, s) => sum + s.wordCount, 0);
 
     // Save paper to database
     try {
       await supabase.from('generated_papers').insert({
         user_id: user.id,
-        paper_id: paper.id,
+        paper_id: `paper-${Date.now()}`,
         topic: config.topic,
         discipline: config.discipline,
         config: config,
-        status: paper.status,
-        total_word_count: paper.totalWordCount,
+        status: 'completed',
+        total_word_count: totalWordCount,
         sections_count: paper.sections.filter(s => s.content).length,
         references_count: paper.references.length,
         tokens_used: stats.totalTokens,
@@ -76,7 +84,7 @@ export async function POST(request: Request) {
       stats: {
         totalTokens: stats.totalTokens,
         completedTasks: stats.completedTasks,
-        totalWordCount: paper.totalWordCount,
+        totalWordCount,
         sectionsGenerated: paper.sections.filter(s => s.content).length,
         referencesFound: paper.references.length,
       },

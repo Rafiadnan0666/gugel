@@ -3,7 +3,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { IResearchSession, ITab, IDraft, ITeam, IProfile, ISessionMessage, IAITrace } from '@/types/main.db';
+import type { ResearchSession, Tab, Draft, Team, Profile, SessionMessage, AITrace } from '@/types/main.db';
 import ActivityChart from '@/components/dashboard/ActivityChart';
 import { 
   FiPlus, 
@@ -105,22 +105,22 @@ interface QuickAction {
 }
 
 interface AIContext {
-  sessions: IResearchSession[];
-  tabs: ITab[];
-  drafts: IDraft[];
-  teams: ITeam[];
+  sessions: ResearchSession[];
+  tabs: Tab[];
+  drafts: Draft[];
+  teams: Team[];
   currentStats: DashboardStats;
-  userProfile: IProfile | null;
+  userProfile: Profile | null;
 }
 
 export default function Dashboard() {
-  const [sessions, setSessions] = useState<IResearchSession[]>([]);
-  const [filteredSessions, setFilteredSessions] = useState<IResearchSession[]>([]);
-  const [drafts, setDrafts] = useState<IDraft[]>([]);
-  const [tabs, setTabs] = useState<ITab[]>([]);
-  const [teams, setTeams] = useState<ITeam[]>([]);
-  const [userProfile, setUserProfile] = useState<IProfile | null>(null);
-  const [aiTraces, setAiTraces] = useState<IAITrace[]>([]);
+  const [sessions, setSessions] = useState<ResearchSession[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<ResearchSession[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  const [aiTraces, setAiTraces] = useState<AITrace[]>([]);
   
   const [stats, setStats] = useState<DashboardStats>({ 
     totalSessions: 0, 
@@ -436,7 +436,7 @@ Please provide a helpful, specific response based on this research context. Focu
       ]);
 
       const sessionsData = sessionsResponse.data || [];
-      const teamsData = teamsResponse.data?.flatMap(t => t.teams).filter(Boolean) as ITeam[] || [];
+      const teamsData = teamsResponse.data?.flatMap(t => t.teams).filter(Boolean) as Team[] || [];
       const tabsData = tabsResponse.data || [];
       const draftsData = draftsResponse.data || [];
       const aiTracesData = aiTracesResponse.data || [];
@@ -462,7 +462,7 @@ Please provide a helpful, specific response based on this research context. Focu
         : recentSessions > 0 ? 100 : 0;
 
       const sessionsWithDrafts = sessionsData.filter(session => 
-        draftsData.some(draft => draft.research_session_id === session.id)
+        draftsData.some(draft => draft.session_id === session.id)
       ).length;
       const completionRate = sessionsData.length > 0 
         ? Math.round((sessionsWithDrafts / sessionsData.length) * 100)
@@ -520,10 +520,10 @@ Please provide a helpful, specific response based on this research context. Focu
 
   // Enhanced AI suggestions generator
   const generateEnhancedAISuggestions = useCallback(async (
-    sessionsData: IResearchSession[], 
-    tabsData: ITab[], 
-    draftsData: IDraft[], 
-    teamsData: ITeam[]
+    sessionsData: ResearchSession[], 
+    tabsData: Tab[], 
+    draftsData: Draft[], 
+    teamsData: Team[]
   ) => {
     const context: AIContext = {
       sessions: sessionsData,
@@ -560,7 +560,7 @@ Please provide a helpful, specific response based on this research context. Focu
   }, [chatWithAI, stats, userProfile]);
 
   // Process activity data for the chart
-  const processActivityData = (sessionsData: IResearchSession[], tabsData: ITab[], draftsData: IDraft[]) => {
+  const processActivityData = (sessionsData: ResearchSession[], tabsData: Tab[], draftsData: Draft[]) => {
     const activityByDate = new Map<string, { sessions: number, tabs: number, drafts: number }>();
 
     for (let i = 13; i >= 0; i--) {
@@ -842,7 +842,7 @@ Please provide a helpful, specific response based on this research context. Focu
     }
 
     const selectedSessionData = sessions.filter(session => selectedSessions.includes(session.id));
-    const draftsToCheck = drafts.filter(draft => selectedSessions.includes(draft.research_session_id));
+    const draftsToCheck = drafts.filter(draft => selectedSessions.includes(draft.session_id));
 
     if (draftsToCheck.length === 0) {
       toast.error('No drafts found for selected sessions');
@@ -1263,9 +1263,9 @@ Please provide a helpful, specific response based on this research context. Focu
                               <FiFileText className="mr-1 w-3 h-3" />
                               {tabs.filter(tab => tab.session_id === session.id).length} tabs
                             </span>
-                            <span className="flex items-center">
+                        <span className="flex items-center">
                               <FiEdit2 className="mr-1 w-3 h-3" />
-                              {drafts.filter(draft => draft.research_session_id === session.id).length} drafts
+                              {drafts.filter(draft => draft.session_id === session.id).length} drafts
                             </span>
                           </div>
                         </div>
@@ -1288,7 +1288,7 @@ Please provide a helpful, specific response based on this research context. Focu
                     drafts.map(draft => (
                       <div
                         key={draft.id}
-                        onClick={() => router.push(`/session/${draft.research_session_id}`)}
+                        onClick={() => router.push(`/session/${draft.session_id}`)}
                         className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition-all hover:shadow-md"
                       >
                         <div className="flex justify-between items-start mb-2">
@@ -1299,8 +1299,8 @@ Please provide a helpful, specific response based on this research context. Focu
                             v{draft.version}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-600">
-                          Updated {formatRelativeTime(draft.updated_at.toString())}
+<p className="text-xs text-gray-600">
+                          Created {formatRelativeTime(draft.created_at.toString())}
                         </p>
                       </div>
                     ))

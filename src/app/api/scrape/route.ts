@@ -5,11 +5,42 @@ import { WebScraper } from '@/lib/web-scraper';
 
 const webScraper = new WebScraper();
 
+const MAX_URLS_PER_REQUEST = 20;
+const MAX_URL_LENGTH = 2048;
+
+function sanitizeUrl(url: string): string | null {
+  if (typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (trimmed.length === 0 || trimmed.length > MAX_URL_LENGTH) return null;
+  try {
+    const parsed = new URL(trimmed.startsWith('http') ? trimmed : `https://${trimmed}`);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
   const { urls, task } = await request.json();
 
   if (!urls) {
     return NextResponse.json({ error: 'URLs are required' }, { status: 400 });
+  }
+
+  // Validate task parameter
+  const validTasks = ['scrape-single', 'scrape-multiple', 'validate-urls'];
+  const normalizedTask = validTasks.includes(task) ? task : 'scrape-single';
+
+  // Sanitize and validate URLs
+  const urlArray = Array.isArray(urls) ? urls : [urls];
+  if (urlArray.length > MAX_URLS_PER_REQUEST) {
+    return NextResponse.json({ error: `Maximum ${MAX_URLS_PER_REQUEST} URLs per request` }, { status: 400 });
+  }
+
+  const sanitizedUrls = urlArray.map(sanitizeUrl).filter(Boolean) as string[];
+  if (sanitizedUrls.length === 0) {
+    return NextResponse.json({ error: 'No valid URLs provided' }, { status: 400 });
   }
 
   const cookieStore = await cookies();
@@ -34,24 +65,19 @@ export async function POST(request: Request) {
   try {
     let result;
 
-    if (task === 'scrape-single') {
-      // Single URL scraping
-      const report = await webScraper.scrapeWebsite(urls);
+    if (normalizedTask === 'scrape-single') {
+      const report = await webScraper.scrapeWebsite(sanitizedUrls[0]);
       result = report;
-    } else if (task === 'scrape-multiple') {
-      // Multiple URLs scraping
-      const urlArray = Array.isArray(urls) ? urls : [urls];
-      const reports = await webScraper.scrapeMultipleWebsites(urlArray);
+    } else if (normalizedTask === 'scrape-multiple') {
+      const reports = await webScraper.scrapeMultipleWebsites(sanitizedUrls);
       const summary = webScraper.generateReportSummary(reports);
       result = {
         reports,
         summary,
         timestamp: new Date().toISOString()
       };
-    } else if (task === 'validate-urls') {
-      // URL validation only
-      const urlArray = Array.isArray(urls) ? urls : [urls];
-      const validations = urlArray.map(url => ({
+    } else if (normalizedTask === 'validate-urls') {
+      const validations = sanitizedUrls.map(url => ({
         url,
         validation: webScraper.validateURL(url)
       }));
@@ -60,8 +86,7 @@ export async function POST(request: Request) {
         timestamp: new Date().toISOString()
       };
     } else {
-      // Default to single scrape
-      const report = await webScraper.scrapeWebsite(urls);
+      const report = await webScraper.scrapeWebsite(sanitizedUrls[0]);
       result = report;
     }
 

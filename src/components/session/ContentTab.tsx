@@ -1,15 +1,15 @@
 'use client';
 
 import { FiBook, FiPlus, FiFileText, FiExternalLink, FiEdit2, FiTrash2, FiCheck } from 'react-icons/fi';
-import type { ITab, ISummary } from '@/types/main.db';
+import type { Tab, Summary } from '@/types/main.db';
 
 interface ContentTabProps {
-  tabs: ITab[];
-  summaries: ISummary[];
+  tabs: Tab[];
+  summaries: Summary[];
   sessionPermissions: 'owner' | 'editor' | 'viewer';
   onGenerateAIDraft: () => void;
   onAddTab: () => void;
-  onEditTab: (tab: ITab) => void;
+  onEditTab: (tab: Tab) => void;
   onDeleteTab: (tabId: string) => void;
 }
 

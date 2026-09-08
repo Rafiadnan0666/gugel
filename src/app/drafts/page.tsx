@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
-import type { IDraft, IResearchSession } from '@/types/main.db';
+import type { Draft, ResearchSession } from '@/types/main.db';
 import {
   FiPlus, FiEdit3, FiTrash2, FiCopy, FiChevronDown,
   FiChevronRight, FiShield, FiDownload, FiBarChart2,
@@ -22,8 +22,8 @@ const ProEditor = dynamic(() => import('@/components/editor/ProEditor').then(mod
 export default function DraftListPage() {
   const supabase = createClient();
   const router = useRouter();
-  const [sessions, setSessions] = useState<IResearchSession[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, IDraft[]>>({});
+  const [sessions, setSessions] = useState<ResearchSession[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, Draft[]>>({});
   const [loading, setLoading] = useState(true);
   const [expandedSessions, setExpandedSessions] = useState<Set<string>>(new Set());
   const [modal, setModal] = useState<{ isOpen: boolean; type: 'session' | 'draft'; item?: any }>({ isOpen: false, type: 'session' });
@@ -96,7 +96,7 @@ export default function DraftListPage() {
     const { data } = await supabase
       .from('drafts')
       .select('*')
-      .eq('research_session_id', sessionId)
+      .eq('session_id', sessionId)
       .order('created_at', { ascending: false })
       .range((page - 1) * 10, page * 10 - 1);
 
@@ -141,7 +141,7 @@ export default function DraftListPage() {
       if (item?.id) {
         await supabase.from('drafts').update({ content, version: (item.version || 0) + 1 }).eq('id', item.id);
       } else {
-        await supabase.from('drafts').insert({ research_session_id: item.sessionId, content, version: 1 });
+        await supabase.from('drafts').insert({ session_id: item.sessionId, content, version: 1 });
       }
       loadDrafts(item.sessionId);
     }
@@ -216,7 +216,7 @@ export default function DraftListPage() {
     }
   };
 
-  const openContextualRewrite = (draft: IDraft) => {
+  const openContextualRewrite = (draft: Draft) => {
     setSelectedDraftForRewrite({
       id: draft.id,
       content: draft.content,
@@ -251,7 +251,7 @@ export default function DraftListPage() {
         // Close modal and refresh drafts
         setSelectedDraftForRewrite(null);
         // Refresh the drafts for the affected session
-        const affectedSessionId = drafts[selectedDraftForRewrite.id]?.[0]?.research_session_id;
+        const affectedSessionId = drafts[selectedDraftForRewrite.id]?.[0]?.session_id;
         if (affectedSessionId) {
           loadDrafts(affectedSessionId);
         }
@@ -262,9 +262,9 @@ export default function DraftListPage() {
     }
   };
 
-  const duplicateDraft = async (draft: IDraft) => {
-    await supabase.from('drafts').insert({ research_session_id: draft.research_session_id, content: draft.content, version: 1 });
-    loadDrafts(draft.research_session_id);
+  const duplicateDraft = async (draft: Draft) => {
+    await supabase.from('drafts').insert({ session_id: draft.session_id, content: draft.content, version: 1 });
+    loadDrafts(draft.session_id);
   };
 
   const deleteItem = async (type: 'session' | 'draft', id: string, sessionId?: string) => {
@@ -354,7 +354,7 @@ export default function DraftListPage() {
         })
         .eq('id', draftId);
 
-      loadDrafts(draft.research_session_id);
+      loadDrafts(draft.session_id);
       alert('Draft enhanced successfully with AI!');
     } catch (error) {
       console.error('AI enhancement failed:', error);
@@ -420,7 +420,7 @@ export default function DraftListPage() {
   };
 
   const handleBulkExport = async () => {
-    const selectedDraftData: IDraft[] = [];
+    const selectedDraftData: Draft[] = [];
     
     for (const draftId of selectedDrafts) {
       for (const sessionId in drafts) {

@@ -9,15 +9,11 @@ interface LanguageModelSession {
   destroy?: () => void;
 }
 
-interface LanguageModelStatic {
-  availability: (opts: LanguageModelOptions) => Promise<string>;
-  create: (opts: LanguageModelOptions & { monitor?: (m: any) => void }) => Promise<LanguageModelSession>;
-}
-
 declare global {
-  interface Window {
-    LanguageModelAPI?: LanguageModelStatic;
-  }
+  var LanguageModel: {
+    availability: (opts: LanguageModelOptions) => Promise<string>;
+    create: (opts: LanguageModelOptions & { monitor?: (m: any) => void }) => Promise<LanguageModelSession>;
+  } | undefined;
 }
 
 interface UseLanguageModelResult {
@@ -37,21 +33,22 @@ const useLanguageModel = (): UseLanguageModelResult => {
 
   const initialize = useCallback(async () => {
     if (session) return;
-    
+
     setIsLoading(true);
     setError(null);
 
     try {
-if (!window.LanguageModelAPI) {
+      if (typeof LanguageModel === 'undefined') {
         setError('LanguageModel API is not available');
+        setIsAvailable(false);
         return;
       }
 
-      const opts = {
+      const opts: LanguageModelOptions = {
         expectedOutputs: [{ type: 'text', languages: ['en'] }]
       };
 
-      const availability = await window.LanguageModelAPI.availability(opts);
+      const availability = await LanguageModel.availability(opts);
       console.log('LanguageModel availability:', availability);
 
       if (availability === 'unavailable') {
@@ -60,7 +57,7 @@ if (!window.LanguageModelAPI) {
         return;
       }
 
-      const newSession = await window.LanguageModelAPI.create({
+      const newSession = await LanguageModel.create({
         ...opts,
         monitor(m: any) {
           m.addEventListener('downloadprogress', (e: any) => {
@@ -72,7 +69,7 @@ if (!window.LanguageModelAPI) {
         }
       });
 
-      console.log('LanguageModel session ready:', newSession);
+      console.log('LanguageModel session ready');
       setSession(newSession);
       setIsAvailable(true);
       setError(null);
@@ -97,7 +94,7 @@ if (!window.LanguageModelAPI) {
     };
   }, []);
 
-  const prompt = useCallback(async (text: string): Promise<string> => {
+  const promptFn = useCallback(async (text: string): Promise<string> => {
     if (!session) {
       throw new Error('Session is not initialized');
     }
@@ -126,7 +123,7 @@ if (!window.LanguageModelAPI) {
     error,
     isLoading,
     isAvailable,
-    prompt,
+    prompt: promptFn,
     reset
   };
 };

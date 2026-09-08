@@ -1,13 +1,13 @@
 'use client';
 
 import { FiClock, FiBook, FiEdit2, FiUsers, FiCpu, FiGitBranch, FiGitPullRequest, FiUser, FiMaximize, FiCheck, FiX, FiEdit3 } from 'react-icons/fi';
-import type { IResearchSession, ITab, IDraft, ISessionCollaborator } from '@/types/main.db';
+import type { ResearchSession, Tab, Draft, SessionCollaborator } from '@/types/main.db';
 
 interface SessionHeaderProps {
-  session: IResearchSession;
-  tabs: ITab[];
-  drafts: IDraft[];
-  collaborators: ISessionCollaborator[];
+  session: ResearchSession;
+  tabs: Tab[];
+  drafts: Draft[];
+  collaborators: SessionCollaborator[];
   aiStatus: string;
   isEditingTitle: boolean;
   editedTitle: string;

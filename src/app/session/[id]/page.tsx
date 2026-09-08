@@ -4,16 +4,25 @@ import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import type { 
-  IResearchSession, 
-  ITab, 
-  IDraft, 
-  ISummary, 
-  ISessionMessage, 
-  ISessionCollaborator,
-  IProfile,
-  ITeam,
-  ITeamMember 
+  ResearchSession, 
+  Tab, 
+  Summary, 
+  SessionMessage, 
+  SessionCollaborator,
+  Profile,
+  Team,
+  TeamMember 
 } from '@/types/main.db';
+
+// Draft interface since it's not in the database schema
+interface Draft {
+  id: string;
+  session_id: string;
+  content: string;
+  version: number;
+  created_at: Date;
+  user_id: string;
+}
 import {
   FiPlus, FiEdit2, FiTrash2, FiSave, FiDownload,
   FiExternalLink, FiZap, FiCpu, FiBook, FiLink, FiClock,
@@ -33,111 +42,83 @@ import {
 import AIResponse from '@/components/AIResponse';
 import { exportToPDF } from '@/lib/pdf';
 
-// Enhanced AI Service with Language Model Integration
+// Enhanced AI Service using server-side API with credit checking
 const useAIService = () => {
-  const [aiSession, setAiSession] = useState<any>(null);
   const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
 
   useEffect(() => {
-    const initializeAI = async () => {
-      try {
-        // Check if LanguageModel API is available
-        if (!(window as any).LanguageModel) {
-          console.warn("LanguageModel API not available, using fallback");
-          setAiStatus('unavailable');
-          return;
-        }
-
-        const opts = {
-          expectedOutputs: [{ type: "text", languages: ["en"] }]
-        };
-
-        const availability = await (window as any).LanguageModel.availability(opts);
-        console.log("AI availability:", availability);
-
-        if (availability === "unavailable") {
-          console.warn("AI model unavailable");
-          setAiStatus('unavailable');
-          return;
-        }
-
-        const session = await (window as any).LanguageModel.create({
-          ...opts,
-          monitor(m: any) {
-            m.addEventListener("downloadprogress", (e: any) => {
-              console.log(`AI download progress: ${(e.loaded * 100).toFixed(1)}%`);
-            });
-            m.addEventListener("statechange", (e: any) => {
-              console.log("AI state change:", e.target.state);
-            });
-          }
-        });
-
-        setAiSession(session);
-        setAiStatus('ready');
-
-      } catch (err) {
-        console.error("AI initialization error:", err);
-        setAiStatus('error');
-      }
-    };
-
-    initializeAI();
+    // Check if AI is available via the API
+    fetch('/api/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'test', task: 'chat' }),
+    })
+      .then(res => {
+        if (res.ok) setAiStatus('ready');
+        else if (res.status === 429) setAiStatus('unavailable'); // no credits
+        else setAiStatus('unavailable');
+      })
+      .catch(() => setAiStatus('unavailable'));
   }, []);
 
-  const promptAI = async (prompt: string) => {
-    if (!aiSession) {
-      console.error("AI session not ready");
-      return "AI not available";
-    }
+  const callAI = async (prompt: string, task: string = 'chat'): Promise<string> => {
     try {
-      const result = await aiSession.prompt(prompt);
-      // Clean AI response from markdown and special characters
-      return result.replace(/(\*\*|##|__|\*|#)/g, '').trim();
+      const response = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, task }),
+      });
+
+      if (response.status === 429) {
+        const data = await response.json();
+        return `Credits required: ${data.error || 'Not enough credits. Please buy more.'}`;
+      }
+
+      if (!response.ok) {
+        const data = await response.json();
+        return `AI error: ${data.error || 'Unknown error'}`;
+      }
+
+      const data = await response.json();
+      return data.result || 'No response from AI';
     } catch (error) {
-      console.error("Error prompting AI:", error);
-      return "Error from AI";
+      console.error('AI call failed:', error);
+      return 'AI service unavailable. Please try again.';
     }
   };
 
-  const generateSummary = async (content: string, type: 'tab' | 'draft') => {
-    const prompt = `Summarize this ${type} content in a concise and informative way. Remove any markdown formatting and keep it clean: ${content.substring(0, 2000)}`;
-    return await promptAI(prompt);
+  const generateSummary = async (content: string, _type: 'tab' | 'draft') => {
+    return callAI(`Summarize this content concisely:\n\n${content.substring(0, 3000)}`, 'enhance-content');
   };
 
   const translateContent = async (content: string, targetLanguage: string) => {
-    const prompt = `Translate the following text to ${targetLanguage}. Keep the meaning accurate and natural, remove any markdown: ${content.substring(0, 2000)}`;
-    return await promptAI(prompt);
+    return callAI(`Translate to ${targetLanguage}:\n\n${content.substring(0, 3000)}`, 'enhance-content');
   };
 
   const rewriteContent = async (content: string, style: string = 'academic') => {
-    const prompt = `Rewrite the following text in ${style} style while preserving the core meaning. Remove markdown and keep it clean: ${content.substring(0, 2000)}`;
-    return await promptAI(prompt);
+    return callAI(`Rewrite in ${style} style:\n\n${content.substring(0, 3000)}`, 'enhance-content');
   };
 
   const expandContent = async (content: string, context: string) => {
-    const prompt = `Expand this content with additional ${context}. Make it more detailed and comprehensive. Remove markdown: ${content.substring(0, 2000)}`;
-    return await promptAI(prompt);
+    return callAI(`Expand with additional ${context}:\n\n${content.substring(0, 3000)}`, 'enhance-content');
   };
 
-  const autoGenerateDraft = async (tabs: ITab[], theme: string, customPrompt?: string) => {
-    const tabContents = tabs.map(tab => 
+  const autoGenerateDraft = async (tabs: Tab[], theme: string, customPrompt?: string) => {
+    const tabContents = tabs.map(tab =>
       `Source: ${tab.title}\nContent: ${tab.content?.substring(0, 500)}`
     ).join('\n\n');
-    
-    const prompt = customPrompt || `Create a well-structured research draft about "${theme}" using these sources. Include introduction, key findings, and conclusion. Use clean formatting without markdown:\n\n${tabContents}`;
-    return await promptAI(prompt);
+
+    const prompt = customPrompt || `Create a research draft about "${theme}" using these sources:\n\n${tabContents}`;
+    return callAI(prompt, 'enhance-content');
   };
 
-  const chatWithAI = async (message: string, context: { tabs: ITab[], drafts: IDraft[] }) => {
-    const contextSummary = `Research Context: ${context.tabs.length} research sources, ${context.drafts.length} drafts`;
-    const prompt = `${contextSummary}\n\nUser Question: ${message}\n\nPlease provide a helpful and accurate response based on the research context. Remove markdown formatting.`;
-    return await promptAI(prompt);
+  const chatWithAI = async (message: string, context: { tabs: Tab[]; drafts: Draft[] }) => {
+    const contextSummary = `Research: ${context.tabs.length} sources, ${context.drafts.length} drafts`;
+    return callAI(`${contextSummary}\n\nUser: ${message}`, 'chat');
   };
 
   const analyzeURLContent = async (url: string) => {
-    const prompt = `Analyze the content from this URL and provide a comprehensive summary with key points. Use clean text without markdown: ${url}`;
-    return await promptAI(prompt);
+    return callAI(url, 'summarize-url');
   };
 
   return {
@@ -149,7 +130,7 @@ const useAIService = () => {
     autoGenerateDraft,
     chatWithAI,
     analyzeURLContent,
-    promptAI
+    promptAI: callAI
   };
 };
 
@@ -240,7 +221,7 @@ const AdvancedEditor: React.FC<{
   placeholder?: string;
   disabled?: boolean;
   onlineUsers?: any[];
-  currentUser?: IProfile | null;
+  currentUser?: Profile | null;
   onAIAction?: (action: string, content: string) => Promise<string>;
 }> = ({ value, onChange, placeholder = "Start writing your research findings...", disabled = false, onlineUsers = [], currentUser, onAIAction }) => {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -709,11 +690,11 @@ const AIDraftModal: React.FC<{
 };
 
 // AI-Powered Tab Modal
-const AITabModal: React.FC<{
+const AITabsModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onSave: (tab: Partial<ITab>) => void;
-  editingTab?: ITab | null;
+  onSave: (tab: Partial<Tab>) => void;
+  editingTab?: Tab | null;
   onAIAnalyze?: (url: string) => Promise<{ title: string; content: string }>;
 }> = ({ isOpen, onClose, onSave, editingTab, onAIAnalyze }) => {
   const [url, setUrl] = useState(editingTab?.url || '');
@@ -874,10 +855,10 @@ const AITabModal: React.FC<{
 
 // Enhanced AI Chat Component
 const AIChat: React.FC<{
-  messages: ISessionMessage[];
+  messages: SessionMessage[];
   onSendMessage: (content: string) => void;
   isLoading: boolean;
-  researchContext: { tabs: ITab[]; drafts: IDraft[] };
+  researchContext: { tabs: Tab[]; drafts: Draft[] };
 }> = ({ messages, onSendMessage, isLoading, researchContext }) => {
   const [input, setInput] = useState('');
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
@@ -1007,7 +988,7 @@ const InviteCollaboratorForm: React.FC<{
   sessionId: string;
   onInviteSent: () => void;
   editedTitle: string;
-  session: IResearchSession | null;
+  session: ResearchSession | null;
 }> = ({ sessionId, onInviteSent, editedTitle, session }) => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'editor' | 'viewer'>('viewer');
@@ -1134,10 +1115,10 @@ const InviteCollaboratorForm: React.FC<{
 
 // Tab Summary Component
 const TabSummary: React.FC<{
-  tab: ITab;
-  summary?: ISummary;
+  tab: Tab;
+  summary?: Summary;
   onGenerateSummary: (tabId: string, content: string) => Promise<void>;
-  onUpdateSummary: (summaryId: string, updates: Partial<ISummary>) => Promise<void>;
+  onUpdateSummary: (summaryId: string, updates: Partial<Summary>) => Promise<void>;
 }> = ({ tab, summary, onGenerateSummary, onUpdateSummary }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showFullSummary, setShowFullSummary] = useState(false);
@@ -1330,24 +1311,24 @@ export default function AdvancedSessionPage() {
   const supabase = createClient();
   
   // State declarations
-  const [session, setSession] = useState<IResearchSession | null>(null);
-  const [tabs, setTabs] = useState<ITab[]>([]);
-  const [drafts, setDrafts] = useState<IDraft[]>([]);
-  const [summaries, setSummaries] = useState<ISummary[]>([]);
+  const [session, setSession] = useState<ResearchSession | null>(null);
+  const [tabs, setTabs] = useState<Tab[]>([]);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [summaries, setSummaries] = useState<Summary[]>([]);
   const [currentDraft, setCurrentDraft] = useState('');
   const [draftVersion, setDraftVersion] = useState(1);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'content' | 'ai' | 'drafts' | 'chat' | 'collaborate'>('content');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
-  const [chatMessages, setChatMessages] = useState<ISessionMessage[]>([]);
+  const [chatMessages, setChatMessages] = useState<SessionMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [modal, setModal] = useState<{ type: string; data?: any }>({ type: '' });
-  const [userProfile, setUserProfile] = useState<IProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [sessionPermissions, setSessionPermissions] = useState<'owner' | 'editor' | 'viewer'>('viewer');
   const [showTabModal, setShowTabModal] = useState(false);
-  const [editingTab, setEditingTab] = useState<ITab | null>(null);
-  const [collaborators, setCollaborators] = useState<ISessionCollaborator[]>([]);
+  const [editingTab, setEditingTab] = useState<Tab | null>(null);
+  const [collaborators, setCollaborators] = useState<SessionCollaborator[]>([]);
   const [showFullEditor, setShowFullEditor] = useState(false);
   const [aiGeneratedDrafts, setAiGeneratedDrafts] = useState<string[]>([]);
   const [isAIGenerating, setIsAIGenerating] = useState(false);
@@ -1416,7 +1397,7 @@ export default function AdvancedSessionPage() {
   };
 
   // Enhanced CRUD Operations with AI Integration
-  const createTab = async (tabData: Partial<ITab>) => {
+  const createTab = async (tabData: Partial<Tab>) => {
     try {
       const { data, error } = await supabase
         .from('tabs')
@@ -1449,7 +1430,7 @@ export default function AdvancedSessionPage() {
     }
   };
 
-  const updateTab = async (tabData: Partial<ITab>) => {
+  const updateTab = async (tabData: Partial<Tab>) => {
     try {
       const { data, error } = await supabase
         .from('tabs')
@@ -1513,7 +1494,7 @@ export default function AdvancedSessionPage() {
     }
   };
 
-  const updateSummary = async (summaryId: string, updates: Partial<ISummary>) => {
+  const updateSummary = async (summaryId: string, updates: Partial<Summary>) => {
     try {
       const { data, error } = await supabase
         .from('summaries')
@@ -1598,7 +1579,7 @@ export default function AdvancedSessionPage() {
     if (!userProfile) return;
 
     const tempId = crypto.randomUUID();
-    const userMessage: ISessionMessage = {
+    const userMessage: SessionMessage = {
       id: tempId,
       session_id: sessionId,
       user_id: userProfile.id,
@@ -1648,9 +1629,10 @@ export default function AdvancedSessionPage() {
     } catch (error) {
       console.error('Error getting AI response:', error);
       // Add error message to chat
-      const errorMessage: ISessionMessage = {
+      const errorMessage: SessionMessage = {
         id: crypto.randomUUID(),
         session_id: sessionId,
+        user_id: userProfile?.id || '',
         content: "Sorry, I encountered an error. Please try again.",
         sender: 'ai',
         created_at: new Date(), // Fixed: Use Date object
@@ -2485,7 +2467,7 @@ export default function AdvancedSessionPage() {
       </Modal>
 
       {/* AI-Powered Tab Modal */}
-      <AITabModal
+      <AITabsModal
         isOpen={showTabModal}
         onClose={() => {
           setShowTabModal(false);

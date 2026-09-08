@@ -1,12 +1,12 @@
 'use client';
 
 import { FiUsers, FiUser, FiShare2, FiDownload } from 'react-icons/fi';
-import type { IProfile } from '@/types/main.db';
+import type { Profile } from '@/types/main.db';
 
 interface CollaborateTabProps {
   isCollaborativeEditing: boolean;
   onlineUsers: any[];
-  userProfile: IProfile | null;
+  userProfile: Profile | null;
   onSetCollaborativeEditing: (isCollaborating: boolean) => void;
   onInvite: () => void;
   onShare: () => void;

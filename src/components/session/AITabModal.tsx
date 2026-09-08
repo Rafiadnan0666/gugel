@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import type { ITab } from '@/types/main.db';
+import type { Tab } from '@/types/main.db';
+import Modal from '@/components/Modal';
 import { FiOctagon, FiInfo } from 'react-icons/fi';
-import Modal from './Modal';
 
 // AI-Powered Tab Modal
 const AITabModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
-  onSave: (tab: Partial<ITab>) => void;
-  editingTab?: ITab | null;
+  onSave: (tab: Partial<Tab>) => void;
+  editingTab?: Tab | null;
   onAIAnalyze?: (url: string) => Promise<{ title: string; content: string }>;
 }> = ({ isOpen, onClose, onSave, editingTab, onAIAnalyze }) => {
   const [url, setUrl] = useState(editingTab?.url || '');

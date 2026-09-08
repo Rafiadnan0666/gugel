@@ -1,13 +1,13 @@
 'use client';
 
 import AIChat from './AIChat'; // Assuming AIChat is refactored
-import type { ISessionMessage, ITab, IDraft } from '@/types/main.db';
+import type { SessionMessage, Tab, Draft } from '@/types/main.db';
 
 interface AIChatTabProps {
-  messages: ISessionMessage[];
+  messages: SessionMessage[];
   onSendMessage: (content: string) => void;
   isLoading: boolean;
-  researchContext: { tabs: ITab[]; drafts: IDraft[] };
+  researchContext: { tabs: Tab[]; drafts: Draft[] };
   aiStatus: string;
 }
 

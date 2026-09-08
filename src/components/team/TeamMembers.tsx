@@ -1,12 +1,12 @@
 'use client';
 
 import { FiUser, FiUsers } from 'react-icons/fi';
-import type { ITeamMember, PresenceUser, IProfile } from '@/types/main.db';
+import type { TeamMember, PresenceUser, Profile } from '@/types/main.db';
 
 interface TeamMembersProps {
-  teamMembers: ITeamMember[];
+  teamMembers: TeamMember[];
   presenceUsers: PresenceUser[];
-  userProfile: IProfile | null;
+  userProfile: Profile | null;
   userRole: 'owner' | 'admin' | 'member' | null;
   onInvite: () => void;
   onRemove: (memberId: string) => void;

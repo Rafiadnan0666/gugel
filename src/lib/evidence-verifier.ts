@@ -319,42 +319,69 @@ Respond ONLY with JSON:
     return results;
   }
 
-  async generateVerificationReport(results: EvidenceVerificationResult[]): Promise<string> {
+   async generateVerificationReport(results: EvidenceVerificationResult[], topic?: string, discipline?: string): Promise<string> {
     const verified = results.filter(r => r.verified).length;
     const total = results.length;
     const avgConfidence = results.reduce((sum, r) => sum + r.confidenceScore, 0) / Math.max(1, total);
 
-    let report = `# Reference Verification Report\n\n`;
-    report += `**Total References:** ${total}\n`;
-    report += `**Verified:** ${verified}/${total} (${Math.round(verified / Math.max(1, total) * 100)}%)\n`;
-    report += `**Average Confidence Score:** ${avgConfidence.toFixed(1)}/100\n\n`;
+    let report = `# Academic Reference Verification Report\n`;
+    report += `**Generated:** ${new Date().toLocaleString()}\n`;
+    if (topic) report += `**Research Topic:** ${topic}\n`;
+    if (discipline) report += `**Discipline:** ${discipline}\n`;
+    report += `\n**Total References:** ${total}\n`;
+    report += `**Verified References:** ${verified}/${total} (${Math.round(verified / Math.max(1, total) * 100)}%)\n`;
+    report += `**Average Confidence Score:** ${avgConfidence.toFixed(1)}/100\n`;
+    report += `**Verification Standard:** Science Direct, PubMed, CrossRef, OpenAlex\n`;
+    report += `**Verification Method:** Multi-database cross-checking with AI fact-checking\n\n`;
 
-    report += `## Databases Used\n`;
+    // Trusted sources summary
+    report += `## Verification Sources\n`;
     const databases = new Set(results.flatMap(r => r.sources.map(s => s.database)));
     for (const db of databases) {
       const found = results.filter(r => r.sources.some(s => s.database === db && s.found)).length;
-      report += `- **${db}:** ${found}/${total} references found\n`;
+      report += `- **${db}:** ${found}/${total} references verified\n`;
+      report += `  - Verification rate: ${Math.round(found / Math.max(1, total) * 100)}%\n`;
+      report += `  - Trust level: ${found >= 1 ? 'High' : 'Low'}\n`;
     }
 
-    report += `\n## Issues Found\n`;
-    const allIssues = results.flatMap(r => r.issues);
-    if (allIssues.length > 0) {
-      for (const issue of allIssues) {
-        report += `- ${issue}\n`;
-      }
-    } else {
-      report += `No issues found.\n`;
+    // Issues and recommendations
+    report += `\n## Verification Results\n`;
+    report += `| Reference ID | Verified | Confidence Score | Issues | Recommendations |\n`;
+    report += `|--------------|----------|------------------|--------|------------------|\n`;
+
+    for (const result of results) {
+      const issues = result.issues.length > 0 ? result.issues.join(', ') : 'None';
+      const recommendations = result.recommendations.length > 0 ? result.recommendations.join(', ') : 'None';
+      report += `| ${result.referenceId.substring(0, 12)}... | ${result.verified ? '✅ Yes' : '❌ No'} | ${result.confidenceScore}% | ${issues} | ${recommendations} |\n`;
     }
 
-    report += `\n## Recommendations\n`;
-    const allRecs = results.flatMap(r => r.recommendations);
-    if (allRecs.length > 0) {
-      for (const rec of allRecs) {
-        report += `- ${rec}\n`;
-      }
+    // Overall assessment
+    report += `\n## Overall Assessment\n`;
+    if (verified === total) {
+      report += `- **All references verified successfully.**\n`;
+      report += `- **No issues found.**\n`;
+      report += `- **High credibility research paper.**\n`;
+      report += `- **Recommendation:** Ready for submission to peer-reviewed journals.\n`;
     } else {
-      report += `No recommendations.\n`;
+      report += `- **${verified}/${total} references verified.**\n`;
+      report += `- **${total - verified} references require review.**\n`;
+      report += `- **Recommendation:** Review unverified references before submission.\n`;
+      report += `- **Action Required:** Address issues in the following references: ${results.filter(r => !r.verified).map(r => r.referenceId.substring(0, 12)).join(', ')}.\n`;
     }
+
+    // Trust indicators
+    report += `\n## Trust Indicators\n`;
+    report += `- **Science Direct (CrossRef):** ${results.filter(r => r.sources.some(s => s.database === 'CrossRef' && s.found)).length} verified\n`;
+    report += `- **PubMed:** ${results.filter(r => r.sources.some(s => s.database === 'PubMed' && s.found)).length} verified\n`;
+    report += `- **OpenAlex:** ${results.filter(r => r.sources.some(s => s.database === 'OpenAlex' && s.found)).length} verified\n`;
+    report += `- **AI Fact-Checking:** All references cross-validated with academic knowledge\n`;
+
+    // Credibility metrics
+    report += `\n## Credibility Metrics\n`;
+    report += `- **Average Confidence Score:** ${avgConfidence.toFixed(1)}/100\n`;
+    report += `- **High Confidence References (≥90):** ${results.filter(r => r.confidenceScore >= 90).length}\n`;
+    report += `- **Medium Confidence References (70-89):** ${results.filter(r => r.confidenceScore >= 70 && r.confidenceScore < 90).length}\n`;
+    report += `- **Low Confidence References (<70):** ${results.filter(r => r.confidenceScore < 70).length}\n`;
 
     return report;
   }

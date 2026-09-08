@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { generatePDFHTML, type PDFOptions } from '@/lib/pdf-generator';
-import type { GeneratedPaper } from '@/lib/research-paper-engine';
+import type { GeneratedPaper } from '@/types/research-paper';
 import { checkRateLimit, RATE_LIMITS, createRateLimitResponse } from '@/lib/rate-limiter';
 
 export async function POST(request: Request) {
