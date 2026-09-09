@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import type { ResearchSession, Tab, Draft, Team, Profile, SessionMessage, AITrace } from '@/types/main.db';
 import ActivityChart from '@/components/dashboard/ActivityChart';
+import AIStatusBadges from '@/components/AIStatusBadges';
 import { 
   FiPlus, 
   FiMessageSquare, 
@@ -1034,10 +1035,11 @@ Please provide a helpful, specific response based on this research context. Focu
                     aiState.status === 'downloading' ? 'bg-yellow-500 animate-pulse' : 
                     aiState.status === 'error' ? 'bg-red-500' : 'bg-gray-500'
                   }`}></div>
-                  AI {aiState.status === 'ready' ? 'Ready' : 
-                      aiState.status === 'downloading' ? `Downloading ${aiState.progress}%` : 
+                  AI {aiState.status === 'ready' ? 'Ready' :
+                      aiState.status === 'downloading' ? `Downloading ${aiState.progress}%` :
                       aiState.status === 'error' ? 'Offline' : 'Checking...'}
                 </div>
+                <AIStatusBadges />
               </div>
             </div>
             <p className="text-gray-600 text-lg">

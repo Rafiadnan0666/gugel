@@ -7,6 +7,7 @@ import Layout from '@/components/Layout';
 import type { ResearchSession } from '@/types/main.db';
 import { FiPlus, FiBook, FiFileText, FiCheck, FiClock, FiDownload, FiGlobe, FiShield, FiCpu, FiAlertCircle, FiLoader, FiEdit3, FiEdit, FiRefreshCw, FiPrinter, FiTrash2, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import AIStatusBadges from '@/components/AIStatusBadges';
 
 interface PaperConfig {
   topic: string;
@@ -403,13 +404,8 @@ export default function ResearchPage() {
             <h1 className="text-3xl font-bold text-gray-900">Research Paper Generator</h1>
             <p className="text-gray-600 mt-2">Generate academic research papers with multi-AI collaboration and evidence verification.</p>
           </div>
-          <div className="flex gap-2">
-            {availableProviders.length > 0 && (
-              <div className="flex items-center gap-1 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-                <FiCpu className="w-4 h-4" />
-                {availableProviders.length} AI {availableProviders.length === 1 ? 'provider' : 'providers'} active
-              </div>
-            )}
+          <div className="flex gap-2 items-center">
+            <AIStatusBadges />
             <button
               onClick={() => setActiveTab('generate')}
               className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-colors flex items-center space-x-2 shadow-md"

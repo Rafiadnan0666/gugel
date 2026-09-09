@@ -44,6 +44,19 @@ export interface ProviderStatus {
   detail?: string;
 }
 
+export interface DiscussAnswer {
+  provider: ProviderId;
+  model: string;
+  text: string;
+}
+
+export interface DiscussResult {
+  answers: DiscussAnswer[];
+  /** True when only one provider answered (the other failed). */
+  partial: boolean;
+  errors: string[];
+}
+
 interface ProviderEntry {
   provider: AIProvider;
   lastError?: string;
@@ -481,6 +494,61 @@ class MultiProviderAIService {
     opts: GenerateOpts & { userId?: string; sessionId?: string } = {}
   ): Promise<GenerateResult> {
     return this.generate(prompt, opts);
+  }
+
+  /**
+   * Multi-AI discussion: ask the top-2 configured cloud providers the same
+   * prompt IN PARALLEL and return both labeled answers (Mistral + OpenRouter
+   * today; automatically follows config if providers are added/removed).
+   * Small per-provider budgets keep it cheap. Throws only when BOTH fail —
+   * callers can then fall back to generate() (cascade + offline local).
+   */
+  async discuss(
+    prompt: string,
+    opts: Omit<GenerateOpts, 'preferredProvider'> & { maxTokens?: number } = {}
+  ): Promise<DiscussResult> {
+    await this.ensureProviders();
+    const cleanPrompt = (prompt || '').trim();
+    if (!cleanPrompt) throw new Error('Prompt is empty');
+
+    const remotes = this.providers.filter((p) => p.id !== 'local').slice(0, 2);
+    if (remotes.length === 0) throw new Error('No cloud AI providers configured');
+
+    const maxTokens = Math.min(opts.maxTokens || 800, 1500);
+    const settled = await Promise.allSettled(
+      remotes.map((p) =>
+        this.tryProvider(p, cleanPrompt, {
+          model: undefined,
+          maxTokens,
+          temperature: opts.temperature ?? 0.7,
+          systemPrompt: opts.systemPrompt,
+          userId: opts.userId,
+          sessionId: opts.sessionId,
+        })
+      )
+    );
+
+    const answers: DiscussAnswer[] = [];
+    const errors: string[] = [];
+    settled.forEach((s, i) => {
+      if (s.status === 'fulfilled' && s.value.text?.trim()) {
+        answers.push({ provider: remotes[i].id, model: s.value.model, text: s.value.text.trim() });
+      } else {
+        const reason = s.status === 'rejected' ? (s.reason?.message || String(s.reason)) : 'empty response';
+        errors.push(`${remotes[i].id}: ${reason}`);
+        const entry = this.providerMap.get(remotes[i].id);
+        if (entry) {
+          entry.errorCount++;
+          entry.lastError = reason;
+        }
+      }
+    });
+
+    if (answers.length === 0) {
+      throw new Error(`Both AI providers failed:\n${errors.join('\n')}`);
+    }
+
+    return { answers, partial: answers.length < remotes.length, errors };
   }
 }
 
