@@ -258,10 +258,7 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">AI Provider</label>
                     <select value={aiProvider} onChange={(e) => setAiProvider(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                      <option value="gemini">Google Gemini (free)</option>
-                      <option value="google-ai-studio">Google AI Studio (free)</option>
                       <option value="mistral">Mistral (free tier)</option>
-                      <option value="deepseek">DeepSeek (free tier)</option>
                       <option value="openrouter">OpenRouter (free models)</option>
                       <option value="local">Local offline draft</option>
                     </select>
@@ -271,9 +268,7 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">AI Model</label>
                     <select value={aiModel} onChange={(e) => setAiModel(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                      <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (free)</option>
                       <option value="mistral-small-latest">Mistral Small (free tier)</option>
-                      <option value="deepseek-chat">DeepSeek Chat (free tier)</option>
                       <option value="google/gemma-4-26b-a4b-it:free">Gemma 4 via OpenRouter (free)</option>
                     </select>
                   </div>

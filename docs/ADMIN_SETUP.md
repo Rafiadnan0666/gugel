@@ -41,13 +41,13 @@ on conflict do nothing;
 
 ## AI provider keys (free tier)
 
-Keys are read from `.env.local` (see `.env.example`). At least one is
-recommended; with none configured the app falls back to the offline local
-draft provider and the research page shows a setup hint:
+Keys are read from `.env.local` (see `.env.example`). Active providers are
+Mistral + OpenRouter (DeepSeek and Google AI Studio were removed — re-add
+their keys anytime to reactivate). At least one key is recommended; with none
+configured the app falls back to the offline local draft provider and the
+research page shows a setup hint:
 
-- `GEMINI_API_KEY` / `GOOGLE_AI_STUDIO_API_KEY` — https://aistudio.google.com/apikey
 - `MISTRAL_API_KEY` — https://console.mistral.ai/
-- `DEEPSEEK_API_KEY` — https://platform.deepseek.com/
 - `OPENROUTER_API_KEY` — https://openrouter.ai/keys
 
 Check live status any time (no login needed): `GET /api/ai/health`.

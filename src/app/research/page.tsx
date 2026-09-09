@@ -459,8 +459,7 @@ export default function ResearchPage() {
               <span className="font-medium">No cloud AI key configured.</span>{' '}
               Papers will be generated as offline local scaffolds. Add a free key to{' '}
               <code className="px-1 bg-yellow-100 rounded">.env.local</code> (
-              <span className="font-medium">GEMINI_API_KEY</span>, MISTRAL_API_KEY, DEEPSEEK_API_KEY, or
-              OPENROUTER_API_KEY) and restart the dev server for full multi-AI generation. See{' '}
+              <span className="font-medium">MISTRAL_API_KEY</span> or OPENROUTER_API_KEY) and restart the dev server for full multi-AI generation. See{' '}
               <code className="px-1 bg-yellow-100 rounded">docs/ADMIN_SETUP.md</code> in the repo.
             </div>
           </div>
