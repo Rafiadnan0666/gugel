@@ -104,7 +104,7 @@ export default function TabwiseSuitLanding() {
     { name: "Next.js", description: "React framework for production" },
     { name: "Tailwind CSS", description: "Utility-first CSS framework" },
     { name: "Supabase", description: "Open source Firebase alternative" },
-    { name: "Gemini", description: "AI by Google" },
+    { name: "Mistral + OpenRouter", description: "Free-tier AI providers" },
     { name: "Chrome Extension", description: "Browser integration" },
     { name: "TypeScript", description: "Type-safe JavaScript" }
   ];

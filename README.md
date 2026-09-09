@@ -1,6 +1,6 @@
 # Concentra — Collaborative Research Platform
 
-> **Concentra** (formerly Tabwise) is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place. Built with Next.js, Supabase, and Google Gemini AI.
+> **Concentra** (formerly Tabwise) is a collaborative research platform that helps you and your team organize, analyze, and write about your findings, all in one place. Built with Next.js, Supabase, and free-tier AI (Mistral + OpenRouter).
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### Research & Collaboration
 - **Collaborative Research Sessions** — Create shared research sessions with your team, keeping all resources in one place
-- **AI-Powered Insights** — Automatically summarize articles, get key insights, and generate citations with built-in AI (Google Gemini)
+- **AI-Powered Insights** — Automatically summarize articles, get key insights, and generate citations with built-in free-tier AI (Mistral + OpenRouter)
 - **Collaborative Drafting** — Write, edit, and comment on research drafts with your team in real-time
 - **Real-time Collaboration** — See who's online and what they're working on via Supabase Realtime
 - **Team Management** — Organize your team, manage members, and control access to research sessions
@@ -72,7 +72,7 @@
 | **Styling** | Tailwind CSS | Utility-first CSS |
 | **Database** | Supabase (PostgreSQL) | Relational DB with realtime |
 | **Authentication** | Supabase Auth | Email/password, OAuth, magic links |
-| **AI** | Google Gemini | Article summarization, insights |
+| **AI** | Mistral + OpenRouter (free tier) | Article summarization, insights |
 | **Realtime** | Supabase Realtime | Live collaboration, presence |
 | **Language** | TypeScript | Type safety |
 
@@ -104,7 +104,7 @@ eyaya/
 │   │   └── team/             # Team management components
 │   ├── lib/                   # Core utilities
 │   │   ├── supabase/         # Supabase client (browser & server)
-│   │   ├── ai/               # Google Gemini integration
+│   │   ├── ai/               # Multi-AI integration (Mistral + OpenRouter)
 │   │   ├── utils.ts          # Helper functions
 │   │   └── validations.ts    # Zod schemas
 │   ├── hooks/                 # Custom React hooks
@@ -127,7 +127,7 @@ User Action → Next.js Server Component → Supabase (PostgreSQL)
                                      ↓
                              Supabase Realtime → Connected Clients
                                      ↓
-                             Google Gemini API → AI Insights
+                             Mistral + OpenRouter APIs → AI Insights
 ```
 
 ---
@@ -159,7 +159,7 @@ See [ERD.md](ERD.md) for the complete Entity Relationship Diagram with Mermaid v
 ### AI & Analytics
 | Table | Primary Key | Foreign Keys | Description |
 |-------|-------------|--------------|-------------|
-| `ai_providers` | `id` (uuid) | - | AI service providers (Gemini, OpenAI, etc.) |
+| `ai_providers` | `id` (uuid) | - | AI service providers (Mistral, OpenRouter, etc.) |
 | `ai_models` | `id` (uuid) | `provider_id` | Specific models per provider |
 | `ai_prompts` | `id` (uuid) | `user_id` | User prompts |
 | `ai_prompt_responses` | `id` (uuid) | `prompt_id`, `provider_id`, `model_id` | AI responses |
@@ -242,7 +242,7 @@ See [ERD.md](ERD.md) for the complete Entity Relationship Diagram with Mermaid v
 - Node.js 18+
 - npm/pnpm/yarn
 - Supabase project (free tier works)
-- Google AI Studio API key (for Gemini)
+- Mistral API key (https://console.mistral.ai/) and/or OpenRouter key (https://openrouter.ai/keys)
 
 ### Installation
 
@@ -266,8 +266,9 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key  # Server-only!
 
-# Google Gemini AI (get from https://aistudio.google.com/)
-GEMINI_API_KEY=your-gemini-api-key
+# AI providers (free tier)
+MISTRAL_API_KEY=your-mistral-api-key
+OPENROUTER_API_KEY=your-openrouter-api-key
 
 # Optional: Analytics, Sentry, etc.
 ```
@@ -322,7 +323,7 @@ Concentra includes a Chrome extension for collecting research resources.
 |------------|--------|------------|
 | **No offline support** | Requires internet connection | Export drafts for offline reading |
 | **Single-file exports** | No batch export of multiple sessions | Manual export per session |
-| **Gemini rate limits** | AI features may throttle on free tier | Cache responses, implement queues |
+| **Free-tier rate limits** | AI features may throttle on free tier | Cache responses, implement queues |
 | **No mobile app** | Web-only currently | PWA support planned |
 | **Basic search** | No full-text search across sessions | Use Supabase `pg_trgm` or Meilisearch |
 | **Limited file upload** | No native file storage integration | Use Supabase Storage bucket |

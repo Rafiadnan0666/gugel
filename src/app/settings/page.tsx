@@ -20,8 +20,8 @@ export default function SettingsPage() {
 
   // Settings fields
   const [theme, setTheme] = useState('system');
-  const [aiProvider, setAiProvider] = useState('gemini');
-  const [aiModel, setAiModel] = useState('gemini-pro');
+  const [aiProvider, setAiProvider] = useState('openrouter');
+  const [aiModel, setAiModel] = useState('google/gemma-4-26b-a4b-it:free');
   const [language, setLanguage] = useState('en');
   const [enableAiSuggestions, setEnableAiSuggestions] = useState(true);
   const [autoSaveDrafts, setAutoSaveDrafts] = useState(true);
@@ -63,8 +63,8 @@ export default function SettingsPage() {
 
       const settings = profileData.settings as any || {};
       setTheme(settings.theme || 'system');
-      setAiProvider(settings.ai_provider || 'gemini');
-      setAiModel(settings.ai_model || 'gemini-pro');
+      setAiProvider(settings.ai_provider || 'openrouter');
+      setAiModel(settings.ai_model || 'google/gemma-4-26b-a4b-it:free');
       setLanguage(settings.language || 'en');
       setEnableAiSuggestions(settings.enable_ai_suggestions !== false);
       setAutoSaveDrafts(settings.auto_save_drafts !== false);

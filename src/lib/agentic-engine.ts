@@ -80,49 +80,50 @@ const TASK_BUDGETS: Partial<Record<TaskType, number>> = {
   'cross-validation': 1500,
 };
 
-// Task routing: which provider is best for which task type
+// Task routing: active providers only (Mistral + OpenRouter).
+// DeepSeek/Gemini entries are kept in the type union for later reactivation,
+// but nothing routes to them while unconfigured — the cascade would skip them
+// anyway. OpenRouter leads (healthy pools), Mistral second (auto-used when
+// its quota recovers or for writing quality).
 const TASK_ROUTING: Record<TaskType, { preferred: ProviderId[]; minCapabilities: string[] }> = {
-  'research-planning':       { preferred: ['gemini', 'deepseek', 'mistral'], minCapabilities: ['reasoning', 'analysis'] },
-  'literature-search':       { preferred: ['gemini', 'deepseek', 'openrouter'], minCapabilities: ['analysis', 'fact-checking'] },
-  'literature-synthesis':    { preferred: ['deepseek', 'gemini', 'mistral'], minCapabilities: ['reasoning', 'analysis', 'fact-checking'] },
-  'hypothesis-generation':   { preferred: ['deepseek', 'gemini', 'mistral'], minCapabilities: ['reasoning', 'analysis'] },
-  'methodology-design':      { preferred: ['deepseek', 'gemini', 'mistral'], minCapabilities: ['reasoning', 'analysis'] },
-  'data-analysis':           { preferred: ['deepseek', 'gemini', 'openrouter'], minCapabilities: ['analysis', 'reasoning'] },
-  'results-interpretation':  { preferred: ['deepseek', 'gemini', 'mistral'], minCapabilities: ['reasoning', 'analysis', 'fact-checking'] },
-  'discussion-writing':      { preferred: ['mistral', 'deepseek', 'gemini'], minCapabilities: ['text-generation', 'reasoning'] },
-  'abstract-writing':        { preferred: ['mistral', 'gemini', 'deepseek'], minCapabilities: ['text-generation', 'summarization', 'reasoning'] },
-  'introduction-writing':    { preferred: ['mistral', 'deepseek', 'gemini'], minCapabilities: ['text-generation', 'reasoning'] },
-  'conclusion-writing':      { preferred: ['mistral', 'deepseek', 'gemini'], minCapabilities: ['text-generation', 'summarization', 'reasoning'] },
-  'citation-formatting':     { preferred: ['deepseek', 'mistral', 'openrouter'], minCapabilities: ['text-generation', 'fact-checking'] },
-  'reference-verification':  { preferred: ['gemini', 'deepseek', 'mistral'], minCapabilities: ['fact-checking', 'analysis', 'reasoning'] },
-  'fact-checking':           { preferred: ['deepseek', 'gemini', 'mistral'], minCapabilities: ['fact-checking', 'analysis', 'reasoning'] },
-  'plagiarism-check':        { preferred: ['deepseek', 'mistral', 'openrouter'], minCapabilities: ['analysis', 'fact-checking'] },
-  'quality-assessment':      { preferred: ['deepseek', 'gemini', 'mistral'], minCapabilities: ['analysis', 'reasoning', 'fact-checking'] },
-  'language-polishing':      { preferred: ['mistral', 'gemini', 'deepseek'], minCapabilities: ['rewriting', 'text-generation'] },
-  'translation':             { preferred: ['gemini', 'mistral', 'deepseek'], minCapabilities: ['translation', 'text-generation'] },
-  'figure-generation':       { preferred: ['deepseek', 'gemini', 'openrouter'], minCapabilities: ['text-generation', 'analysis'] },
-  'table-generation':        { preferred: ['deepseek', 'gemini', 'openrouter'], minCapabilities: ['text-generation', 'analysis'] },
-  'simulation':              { preferred: ['deepseek', 'gemini', 'openrouter'], minCapabilities: ['reasoning', 'analysis', 'fact-checking'] },
-  'cover-page-design':       { preferred: ['gemini', 'mistral', 'openrouter'], minCapabilities: ['text-generation', 'reasoning'] },
-  'cross-validation':        { preferred: ['deepseek', 'gemini', 'mistral'], minCapabilities: ['fact-checking', 'analysis', 'reasoning'] },
+  'research-planning':       { preferred: ['openrouter', 'mistral'], minCapabilities: ['reasoning', 'analysis'] },
+  'literature-search':       { preferred: ['openrouter', 'mistral'], minCapabilities: ['analysis', 'fact-checking'] },
+  'literature-synthesis':    { preferred: ['openrouter', 'mistral'], minCapabilities: ['reasoning', 'analysis', 'fact-checking'] },
+  'hypothesis-generation':   { preferred: ['openrouter', 'mistral'], minCapabilities: ['reasoning', 'analysis'] },
+  'methodology-design':      { preferred: ['openrouter', 'mistral'], minCapabilities: ['reasoning', 'analysis'] },
+  'data-analysis':           { preferred: ['openrouter', 'mistral'], minCapabilities: ['analysis', 'reasoning'] },
+  'results-interpretation':  { preferred: ['openrouter', 'mistral'], minCapabilities: ['reasoning', 'analysis', 'fact-checking'] },
+  'discussion-writing':      { preferred: ['mistral', 'openrouter'], minCapabilities: ['text-generation', 'reasoning'] },
+  'abstract-writing':        { preferred: ['mistral', 'openrouter'], minCapabilities: ['text-generation', 'summarization', 'reasoning'] },
+  'introduction-writing':    { preferred: ['mistral', 'openrouter'], minCapabilities: ['text-generation', 'reasoning'] },
+  'conclusion-writing':      { preferred: ['mistral', 'openrouter'], minCapabilities: ['text-generation', 'summarization', 'reasoning'] },
+  'citation-formatting':     { preferred: ['openrouter', 'mistral'], minCapabilities: ['text-generation', 'fact-checking'] },
+  'reference-verification':  { preferred: ['openrouter', 'mistral'], minCapabilities: ['fact-checking', 'analysis', 'reasoning'] },
+  'fact-checking':           { preferred: ['openrouter', 'mistral'], minCapabilities: ['fact-checking', 'analysis', 'reasoning'] },
+  'plagiarism-check':        { preferred: ['openrouter', 'mistral'], minCapabilities: ['analysis', 'fact-checking'] },
+  'quality-assessment':      { preferred: ['openrouter', 'mistral'], minCapabilities: ['analysis', 'reasoning', 'fact-checking'] },
+  'language-polishing':      { preferred: ['mistral', 'openrouter'], minCapabilities: ['rewriting', 'text-generation'] },
+  'translation':             { preferred: ['openrouter', 'mistral'], minCapabilities: ['translation', 'text-generation'] },
+  'figure-generation':       { preferred: ['openrouter', 'mistral'], minCapabilities: ['text-generation', 'analysis'] },
+  'table-generation':        { preferred: ['openrouter', 'mistral'], minCapabilities: ['text-generation', 'analysis'] },
+  'simulation':              { preferred: ['openrouter', 'mistral'], minCapabilities: ['reasoning', 'analysis', 'fact-checking'] },
+  'cover-page-design':       { preferred: ['openrouter', 'mistral'], minCapabilities: ['text-generation', 'reasoning'] },
+  'cross-validation':        { preferred: ['openrouter', 'mistral'], minCapabilities: ['fact-checking', 'analysis', 'reasoning'] },
 };
 
 function selectProvider(taskType: TaskType): ProviderId {
   const routing = TASK_ROUTING[taskType];
-  // Prioritize Gemini for research tasks, Mistral for writing, DeepSeek for reasoning
-  if (taskType.includes('research') || taskType.includes('literature') || taskType.includes('verification')) {
-    return 'gemini';
-  } else if (taskType.includes('writing') || taskType.includes('polishing')) {
+  // OpenRouter for research/analysis (healthy pools), Mistral for writing
+  // quality (cascade covers it while throttled).
+  if (taskType.includes('writing') || taskType.includes('polishing')) {
     return 'mistral';
-  } else if (taskType.includes('reasoning') || taskType.includes('analysis') || taskType.includes('simulation')) {
-    return 'deepseek';
   }
   return routing.preferred[0];
 }
 
 function selectCrossValidator(): ProviderId {
-  // Use DeepSeek for cross-validation due to its strong reasoning capabilities
-  return 'deepseek';
+  // Cross-model review via the second active provider.
+  return 'openrouter';
 }
 
 export class AgenticEngine {

@@ -50,7 +50,7 @@ Content to translate:
 ${content}`;
 
   const result = await aiService.generate(prompt, {
-    preferredProvider: 'gemini',
+    preferredProvider: 'openrouter',
     maxTokens: 8000,
     temperature: 0.3,
   });

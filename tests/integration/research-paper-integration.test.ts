@@ -17,7 +17,7 @@ function createMockEngine() {
     executeTask: vi.fn(async (type: string, _desc: string, input: any) => ({
       status: 'completed',
       output: `${type} output on "${input?.topic ?? 'topic'}". Monte Carlo simulation with parameters, bar chart with p-values < 0.05 and confidence intervals.`,
-      providerUsed: 'deepseek',
+      providerUsed: 'openrouter',
     })),
     getTotalTokensUsed: vi.fn(() => 2000),
     getCompletedTasks: vi.fn(() => [{}, {}, {}]),
@@ -105,7 +105,7 @@ describe('ResearchPaperEngine Integration', () => {
         executeTask: vi.fn(async () => ({
           status: 'completed',
           output: 'Simulación de Monte Carlo con parámetros y gráfico de barras.',
-          providerUsed: 'deepseek',
+          providerUsed: 'openrouter',
         })),
       });
 

@@ -291,7 +291,7 @@ Respond ONLY with JSON:
 
     try {
       const result = await aiService.generate(prompt, {
-        preferredProvider: 'gemini',
+        preferredProvider: 'openrouter',
         maxTokens: 500,
         temperature: 0.3,
       });

@@ -20,7 +20,7 @@ function createMockEngine(output?: string) {
       output:
         output ??
         `${type} output on "${input?.topic ?? 'topic'}". Monte Carlo simulation with parameters, bar chart with p-values < 0.05 and confidence intervals.`,
-      providerUsed: 'deepseek',
+      providerUsed: 'mistral',
     })),
     getTotalTokensUsed: vi.fn(() => 1000),
     getCompletedTasks: vi.fn(() => []),

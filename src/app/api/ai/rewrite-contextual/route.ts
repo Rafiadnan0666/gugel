@@ -71,8 +71,8 @@ ORIGINAL CONTENT:
 Rewrite the content now. Return ONLY the rewritten text, no commentary.`;
 
   try {
-    // Use the multi-provider free-tier service (Gemini / Mistral / DeepSeek /
-    // OpenRouter with local offline fallback) instead of paid-only APIs.
+    // Use the multi-provider free-tier service (Mistral / OpenRouter with
+    // local offline fallback) instead of paid-only APIs.
     const { aiService } = await import('@/lib/ai-service');
     const result = await aiService.generate(prompt, {
       preferredProvider: 'mistral',
