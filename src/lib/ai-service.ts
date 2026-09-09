@@ -514,11 +514,12 @@ class MultiProviderAIService {
   }
 
   /**
-   * Multi-AI discussion: ask the top-2 configured cloud providers the same
-   * prompt IN PARALLEL and return both labeled answers (Mistral + OpenRouter
-   * today; automatically follows config if providers are added/removed).
-   * Small per-provider budgets keep it cheap. Throws only when BOTH fail —
-   * callers can then fall back to generate() (cascade + offline local).
+   * Multi-AI discussion: get the same prompt answered by TWO different models
+   * so the user can visibly compare (Mistral + OpenRouter when both healthy).
+   * If a slot fails (e.g. throttled), it is backfilled with the next fallback
+   * model, so a single sick provider can't collapse the discussion to one
+   * voice. Throws only when nothing answered — callers then fall back to
+   * generate() (cascade + offline local).
    */
   async discuss(
     prompt: string,
@@ -528,14 +529,33 @@ class MultiProviderAIService {
     const cleanPrompt = (prompt || '').trim();
     if (!cleanPrompt) throw new Error('Prompt is empty');
 
-    const remotes = this.providers.filter((p) => p.id !== 'local').slice(0, 2);
-    if (remotes.length === 0) throw new Error('No cloud AI providers configured');
+    // Candidate slots: top-2 remote providers; OpenRouter expands into
+    // per-model candidates (different upstream pools).
+    interface Candidate { provider: AIProvider; model?: string }
+    const candidates: Candidate[] = [];
+    for (const p of this.providers.filter((x) => x.id !== 'local').slice(0, 2)) {
+      if (p.id === 'openrouter') {
+        for (const m of OPENROUTER_FALLBACK_MODELS.slice(0, 5)) {
+          candidates.push({ provider: p, model: m });
+        }
+      } else {
+        candidates.push({ provider: p, model: undefined });
+      }
+    }
+    if (candidates.length === 0) throw new Error('No cloud AI providers configured');
 
     const maxTokens = Math.min(opts.maxTokens || 800, 1500);
+    const answers: DiscussAnswer[] = [];
+    const errors: string[] = [];
+    const usedModels = new Set<string>();
+    let attempts = 0;
+
+    // Round 1: first two distinct candidates in parallel.
+    const firstTwo = candidates.splice(0, 2);
     const settled = await Promise.allSettled(
-      remotes.map((p) =>
-        this.tryProvider(p, cleanPrompt, {
-          model: undefined,
+      firstTwo.map((c) =>
+        this.tryProvider(c.provider, cleanPrompt, {
+          model: c.model,
           maxTokens,
           temperature: opts.temperature ?? 0.7,
           systemPrompt: opts.systemPrompt,
@@ -544,16 +564,16 @@ class MultiProviderAIService {
         })
       )
     );
-
-    const answers: DiscussAnswer[] = [];
-    const errors: string[] = [];
     settled.forEach((s, i) => {
+      attempts++;
+      const key = `${firstTwo[i].provider.id}:${s.status === 'fulfilled' ? s.value.model : firstTwo[i].model}`;
+      usedModels.add(key);
       if (s.status === 'fulfilled' && s.value.text?.trim()) {
-        answers.push({ provider: remotes[i].id, model: s.value.model, text: s.value.text.trim() });
+        answers.push({ provider: firstTwo[i].provider.id, model: s.value.model, text: s.value.text.trim() });
       } else {
         const reason = s.status === 'rejected' ? (s.reason?.message || String(s.reason)) : 'empty response';
-        errors.push(`${remotes[i].id}: ${reason}`);
-        const entry = this.providerMap.get(remotes[i].id);
+        errors.push(`${firstTwo[i].provider.id} (${firstTwo[i].model || 'default'}): ${reason}`);
+        const entry = this.providerMap.get(firstTwo[i].provider.id);
         if (entry) {
           entry.errorCount++;
           entry.lastError = reason;
@@ -561,11 +581,36 @@ class MultiProviderAIService {
       }
     });
 
+    // Backfill: while fewer than 2 answers, try the next unused candidate
+    // sequentially (max 5 total attempts to bound cost/latency).
+    while (answers.length < 2 && candidates.length > 0 && attempts < 5) {
+      const next = candidates.shift()!;
+      const key = `${next.provider.id}:${next.model || 'default'}`;
+      if (usedModels.has(key)) continue;
+      usedModels.add(key);
+      attempts++;
+      try {
+        const r = await this.tryProvider(next.provider, cleanPrompt, {
+          model: next.model,
+          maxTokens,
+          temperature: opts.temperature ?? 0.7,
+          systemPrompt: opts.systemPrompt,
+          userId: opts.userId,
+          sessionId: opts.sessionId,
+        });
+        if (r.text?.trim()) {
+          answers.push({ provider: next.provider.id, model: r.model, text: r.text.trim() });
+        }
+      } catch (e: any) {
+        errors.push(`${next.provider.id} (${next.model || 'default'}): ${e.message}`);
+      }
+    }
+
     if (answers.length === 0) {
       throw new Error(`Both AI providers failed:\n${errors.join('\n')}`);
     }
 
-    return { answers, partial: answers.length < remotes.length, errors };
+    return { answers, partial: answers.length < 2, errors };
   }
 }
 
