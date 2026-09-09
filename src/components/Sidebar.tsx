@@ -108,11 +108,19 @@ const NAVIGATION_ITEMS: readonly NavItem[] = [
 
 const ADMIN_NAVIGATION_ITEMS: readonly NavItem[] = [
   {
+    id: 'admin-dashboard',
+    href: '/admin/dashboard',
+    icon: <FiHome className="text-lg" />,
+    label: 'Admin Dashboard',
+    exact: true,
+    adminOnly: true
+  },
+  {
     id: 'admin-users',
     href: '/admin/users',
     icon: <FiUser className="text-lg" />,
     label: 'Users',
-    exact: true,
+    exact: false,
     adminOnly: true
   },
   {
@@ -120,39 +128,39 @@ const ADMIN_NAVIGATION_ITEMS: readonly NavItem[] = [
     href: '/admin/billing',
     icon: <FiSettings className="text-lg" />,
     label: 'Billing',
-    exact: true,
+    exact: false,
     adminOnly: true
   },
   {
     id: 'admin-collaboration',
-    href: '/admin/collaboration',
+    href: '/admin/collaboration/research-sessions',
     icon: <FiUsers className="text-lg" />,
     label: 'Collaboration',
-    exact: true,
+    exact: false,
     adminOnly: true
   },
   {
     id: 'admin-content',
-    href: '/admin/content',
+    href: '/admin/content/tabs',
     icon: <FiArchive className="text-lg" />,
     label: 'Content',
-    exact: true,
+    exact: false,
     adminOnly: true
   },
   {
     id: 'admin-ai',
-    href: '/admin/ai-management',
+    href: '/admin/ai-providers',
     icon: <FiSettings className="text-lg" />,
     label: 'AI Management',
-    exact: true,
+    exact: false,
     adminOnly: true
   },
   {
     id: 'admin-system',
-    href: '/admin/system',
+    href: '/admin/audit-log',
     icon: <FiActivity className="text-lg" />,
     label: 'System',
-    exact: true,
+    exact: false,
     adminOnly: true
   }
 ];

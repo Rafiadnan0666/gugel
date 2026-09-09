@@ -15,6 +15,11 @@ const eslintConfig = [
     rules: {
       "react/react-in-jsx-scope": "off",
       "react/prop-types": "off",
+      // Data fetching inside useEffect is the standard pattern in this
+      // codebase; the v7 "no setState in effect" rule flags every page.
+      "react-hooks/set-state-in-effect": "off",
+      // Experimental immutability rule — too strict for existing code.
+      "react-hooks/immutability": "off",
     },
   }),
   {

@@ -5,10 +5,12 @@ import { translateSection, translateFullPaper, rewriteInLanguage, type Supported
 import { sanitizeInput, checkRateLimit, RATE_LIMITS, createRateLimitResponse } from '@/lib/rate-limiter';
 
 export async function POST(request: Request) {
-  const rl = checkRateLimit('ai-generate', RATE_LIMITS['ai-generate']);
-  if (!rl.allowed) return createRateLimitResponse(rl.resetAt, RATE_LIMITS['ai-generate'].message || 'Rate limit exceeded');
-
-  const body = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
   const { content, sections, targetLanguage, sourceLanguage, mode, style } = body;
 
   // Auth
@@ -23,6 +25,9 @@ export async function POST(request: Request) {
   if (userError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rl = checkRateLimit(`ai-generate:${user.id}`, RATE_LIMITS['ai-generate']);
+  if (!rl.allowed) return createRateLimitResponse(rl.resetAt, RATE_LIMITS['ai-generate'].message || 'Rate limit exceeded');
 
   try {
     const srcLang = (sourceLanguage || 'en') as SupportedLanguage;

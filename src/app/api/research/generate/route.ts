@@ -2,11 +2,25 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { ResearchPaperEngine, type PaperConfig } from '@/lib/research-paper-engine';
+import { createAgenticEngine } from '@/lib/agentic-engine';
 import { validatePaperConfig, sanitizeInput, checkRateLimit, RATE_LIMITS, createRateLimitResponse } from '@/lib/rate-limiter';
 
 export async function POST(request: Request) {
-  // Rate limit
-  const rl = checkRateLimit('ai-paper', RATE_LIMITS['ai-paper']);
+  // Auth first so rate limiting is per-user (global keys block all users).
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { get(name: string) { return cookieStore.get(name)?.value; } } }
+  );
+
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // Rate limit per user, not globally.
+  const rl = checkRateLimit(`ai-paper:${user.id}`, RATE_LIMITS['ai-paper']);
   if (!rl.allowed) return createRateLimitResponse(rl.resetAt, RATE_LIMITS['ai-paper'].message || 'Rate limit exceeded');
 
   const body = await request.json();
@@ -27,21 +41,13 @@ export async function POST(request: Request) {
   }
 
   // Auth
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value; } } }
-  );
-
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  // (authenticated above for per-user rate limiting)
 
   try {
-    const { aiService } = await import('@/lib/ai-service');
-    const engine = new ResearchPaperEngine(config, aiService as any);
+    // Real agentic engine: routes each section to the best free-tier model
+    // with per-task token budgets (cost-controlled, no double passes).
+    const agentic = createAgenticEngine(user.id);
+    const engine = new ResearchPaperEngine(config, agentic);
 
     // Set up progress tracking
     let lastProgress = '';

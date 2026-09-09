@@ -25,17 +25,25 @@ export async function deepSeekGenerate(
   const maxTokens = options.maxTokens || 4096;
   const temperature = options.temperature ?? 0.7;
 
-  const res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${DEEPSEEK_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+      signal: AbortSignal.timeout(25000),
+    });
+  } catch (e: any) {
+    throw new Error(`DeepSeek network error: ${e.message}.`);
+  }
 
   if (!res.ok) {
     const err = await res.text();
+    if (res.status === 401) throw new Error('DeepSeek auth error (401): invalid API key. Get one at https://platform.deepseek.com/');
+    if (res.status === 429) throw new Error('DeepSeek rate limit exceeded. Try another provider.');
     throw new Error(`DeepSeek API error (${res.status}): ${err}`);
   }
 

@@ -45,11 +45,40 @@ export interface AgenticTask {
 
 export interface WorkflowConfig {
   maxConcurrentTasks: number;
+  /** When true, minimise paid/remote calls: smaller token budgets, no double-model passes. */
   costOptimization: boolean;
+  /** Second-model review pass. OFF by default — it doubles AI cost per section. Enable only for final polish. */
   crossValidation: boolean;
   userId?: string;
   sessionId?: string;
 }
+
+/** Token budget per task type — caps cost while keeping quality. */
+const TASK_BUDGETS: Partial<Record<TaskType, number>> = {
+  'abstract-writing': 800,
+  'introduction-writing': 2000,
+  'literature-search': 2000,
+  'literature-synthesis': 2500,
+  'hypothesis-generation': 1200,
+  'methodology-design': 2000,
+  'data-analysis': 2000,
+  'results-interpretation': 2000,
+  'discussion-writing': 2500,
+  'conclusion-writing': 1500,
+  'citation-formatting': 1500,
+  'reference-verification': 1000,
+  'fact-checking': 1200,
+  'plagiarism-check': 800,
+  'quality-assessment': 1200,
+  'language-polishing': 2500,
+  'translation': 4000,
+  'figure-generation': 1000,
+  'table-generation': 1000,
+  'simulation': 1500,
+  'cover-page-design': 800,
+  'research-planning': 1500,
+  'cross-validation': 1500,
+};
 
 // Task routing: which provider is best for which task type
 const TASK_ROUTING: Record<TaskType, { preferred: ProviderId[]; minCapabilities: string[] }> = {
@@ -100,7 +129,7 @@ export class AgenticEngine {
   private tasks: Map<string, AgenticTask> = new Map();
   private config: WorkflowConfig;
 
-  constructor(config: WorkflowConfig = { maxConcurrentTasks: 3, costOptimization: true, crossValidation: true }) {
+  constructor(config: WorkflowConfig = { maxConcurrentTasks: 3, costOptimization: true, crossValidation: false }) {
     this.config = config;
   }
 
@@ -124,9 +153,12 @@ export class AgenticEngine {
       task.providerUsed = provider;
 
       const prompt = this.buildPrompt(taskType, description, input);
+      // Cost control: per-task token budget instead of flat 4096.
+      const budget = TASK_BUDGETS[taskType] ?? 2000;
+      const maxTokens = Math.min(budget, input.maxTokens || budget);
       const result = await aiService.generate(prompt, {
         preferredProvider: provider,
-        maxTokens: 4096,
+        maxTokens,
         temperature: 0.7,
         userId: this.config.userId,
         sessionId: this.config.sessionId,
@@ -139,8 +171,9 @@ export class AgenticEngine {
       task.completedAt = new Date();
       task.progress = 100;
 
-      // Cross-validation: run a second model to verify
-      if (this.config.crossValidation && result.text.length > 200) {
+      // Cross-validation is opt-in only: it doubles AI cost (second model
+      // pass over every section). Only run for long outputs when enabled.
+      if (this.config.crossValidation && result.text.length > 500) {
         const validated = await this.crossValidate(taskType, result.text);
         if (validated) task.output = validated;
       }
@@ -280,7 +313,9 @@ export function createAgenticEngine(userId?: string, sessionId?: string): Agenti
   return new AgenticEngine({
     maxConcurrentTasks: 3,
     costOptimization: true,
-    crossValidation: true,
+    // Keep cross-validation OFF by default so a 7-section paper costs 7
+    // calls, not 14. Enable per-request for final polish passes.
+    crossValidation: false,
     userId,
     sessionId,
   });

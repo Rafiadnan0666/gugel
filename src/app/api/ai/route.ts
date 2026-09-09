@@ -4,11 +4,19 @@ import { NextResponse } from 'next/server';
 import { WebScraper } from '@/lib/web-scraper';
 import { aiService } from '@/lib/ai-service';
 import { usageTracking } from '@/lib/usage-tracking';
+import { checkRateLimit, RATE_LIMITS, createRateLimitResponse, sanitizeInput } from '@/lib/rate-limiter';
 
 const webScraper = new WebScraper();
 
 export async function POST(request: Request) {
-  const { prompt, task } = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const { prompt: rawPrompt, task } = body;
+  const prompt = typeof rawPrompt === 'string' ? sanitizeInput(rawPrompt) : '';
 
   if (!prompt || !task) {
     return NextResponse.json({ error: 'prompt and task are required' }, { status: 400 });
@@ -32,6 +40,9 @@ export async function POST(request: Request) {
   if (userError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+
+  const rl = checkRateLimit(`ai-generate:${user.id}`, RATE_LIMITS['ai-generate']);
+  if (!rl.allowed) return createRateLimitResponse(rl.resetAt, RATE_LIMITS['ai-generate'].message || 'Rate limit exceeded');
 
   try {
     // Check quota before processing

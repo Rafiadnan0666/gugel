@@ -25,19 +25,27 @@ export async function openRouterGenerate(
   const maxTokens = options.maxTokens || 4096;
   const temperature = options.temperature ?? 0.7;
 
-  const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-      'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-      'X-Title': 'Eyaya Research Platform',
-    },
-    body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        'X-Title': 'Eyaya Research Platform',
+      },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+      signal: AbortSignal.timeout(30000),
+    });
+  } catch (e: any) {
+    throw new Error(`OpenRouter network error: ${e.message}.`);
+  }
 
   if (!res.ok) {
     const err = await res.text();
+    if (res.status === 401) throw new Error('OpenRouter auth error (401): invalid API key. Get a free key at https://openrouter.ai/keys');
+    if (res.status === 429) throw new Error('OpenRouter rate limit exceeded. Try another provider or wait a minute.');
     throw new Error(`OpenRouter API error (${res.status}): ${err}`);
   }
 

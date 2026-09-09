@@ -6,7 +6,9 @@ export function useKeydownHandler(
   enabled: boolean = true
 ) {
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
 
   useEffect(() => {
     if (!enabled) return;
@@ -29,7 +31,9 @@ export function useClickOutside(
   enabled: boolean = true
 ) {
   const handlerRef = useRef(handler);
-  handlerRef.current = handler;
+  useEffect(() => {
+    handlerRef.current = handler;
+  });
 
   useEffect(() => {
     if (!enabled) return;
@@ -109,6 +113,7 @@ export function useThrottle<T extends (...args: any[]) => any>(
   fn: T,
   delay: number
 ): T {
+  // eslint-disable-next-line react-hooks/purity -- initializer runs once; Date.now() here is intentional
   const lastRun = useRef(Date.now());
 
   return useCallback((...args: Parameters<T>) => {

@@ -4,6 +4,15 @@ import type { UserCredit, AiUsageLog, CreditLedger, RoleAiQuota } from '@/types/
 // Re-export types for convenience
 export type { AiUsageLog, CreditLedger };
 
+/**
+ * Credits are DISABLED by default. The app runs fully on free-tier AI with
+ * no payment wall unless the operator explicitly opts in with
+ * CREDITS_ENABLED=true in the environment.
+ */
+export function isCreditsEnabled(): boolean {
+  return process.env.CREDITS_ENABLED === 'true';
+}
+
 export interface UsageStats {
   todayTokens: number;
   monthTokens: number;
@@ -22,7 +31,14 @@ export interface QuotaEnforcement {
 }
 
 export class UsageTrackingService {
-  private supabase = createClient();
+  // Lazy client: constructing a Supabase client throws when env vars are
+  // missing (e.g. unit tests). Only create it on first actual DB use —
+  // and credits-disabled mode never touches the DB at all.
+  private _supabase: ReturnType<typeof createClient> | null = null;
+  private get supabase() {
+    if (!this._supabase) this._supabase = createClient();
+    return this._supabase;
+  }
 
   /**
    * Get user's current usage statistics
@@ -100,6 +116,10 @@ export class UsageTrackingService {
    * Check if user can make an AI request based on quota
    */
   async checkQuota(userId: string, requestedTokens: number = 1000): Promise<QuotaEnforcement> {
+    // Credits disabled → free-tier mode, never block on quota/credits.
+    if (!isCreditsEnabled()) {
+      return { allowed: true, remainingTokens: Number.MAX_SAFE_INTEGER, hardStop: false };
+    }
     try {
       const usageStats = await this.getUsageStats(userId);
       
@@ -173,6 +193,9 @@ export class UsageTrackingService {
     outputTokens: number,
     cost: number
   ): Promise<void> {
+    // Credits disabled → skip all DB writes so missing tables/quotas can
+    // never break AI generation. Usage is simply not tracked.
+    if (!isCreditsEnabled()) return;
     try {
       const totalTokens = inputTokens + outputTokens;
 

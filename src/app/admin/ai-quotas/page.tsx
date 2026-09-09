@@ -408,7 +408,7 @@ export default function RoleAiQuotasPage() {
 
       {quotas.length === 0 && (
         <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-          No AI quotas found. Click "Add Quota" to create the first one.
+          No AI quotas found. Click &quot;Add Quota&quot; to create the first one.
         </div>
       )}
     </div>

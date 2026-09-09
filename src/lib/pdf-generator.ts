@@ -378,7 +378,7 @@ ${opts.includeTableOfContents ? generateTOCHTML(paper.sections) : ''}`;
   }
 
   // Appendices
-  for (let i = 0; i < paper.appendices.length; i++) {
+  for (let i = 0; i < (paper.appendices || []).length; i++) {
     html += `
 <div class="page">
   <div class="appendix-title">Appendix ${String.fromCharCode(65 + i)}: ${paper.appendices[i].title}</div>

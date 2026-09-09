@@ -17,7 +17,12 @@ export async function GET() {
   }
 
   try {
-    const providers = await aiService.getAvailableProviders();
+    // Cached (60s), parallel checks — the old sequential live ping per
+    // provider made this endpoint slow and heavy.
+    const status = await aiService.getProviderStatus();
+    const providers = status
+      .filter((s) => s.available)
+      .map((s) => ({ id: s.id, name: s.name, freeTier: s.freeTier, model: s.model }));
     return NextResponse.json({ providers });
   } catch (error: any) {
     return NextResponse.json({ providers: [], error: error.message });

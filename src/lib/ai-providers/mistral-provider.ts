@@ -26,17 +26,25 @@ export async function mistralGenerate(
   const maxTokens = options.maxTokens || 4096;
   const temperature = options.temperature ?? 0.7;
 
-  const res = await fetch(`${MISTRAL_BASE}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${config.apiKey}`,
-    },
-    body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${MISTRAL_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      },
+      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+      signal: AbortSignal.timeout(25000),
+    });
+  } catch (e: any) {
+    throw new Error(`Mistral network error: ${e.message}.`);
+  }
 
   if (!res.ok) {
     const err = await res.text();
+    if (res.status === 401) throw new Error('Mistral auth error (401): invalid API key. Get a free key at https://console.mistral.ai/');
+    if (res.status === 429) throw new Error('Mistral rate limit exceeded. Try another provider.');
     throw new Error(`Mistral API error (${res.status}): ${err}`);
   }
 

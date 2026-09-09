@@ -193,7 +193,7 @@ export default function UsagePage() {
           {usageStats.isNearLimit && (
             <div className="mt-3 flex items-center text-sm text-yellow-600">
               <FiAlertTriangle className="w-4 h-4 mr-2" />
-              You're approaching your monthly token limit
+              You&apos;re approaching your monthly token limit
             </div>
           )}
         </div>

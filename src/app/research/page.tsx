@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import Layout from '@/components/Layout';
 import type { ResearchSession } from '@/types/main.db';
-import { FiPlus, FiBook, FiFileText, FiCheck, FiClock, FiDownload, FiGlobe, FiShield, FiCpu, FiAlertCircle, FiLoader, FiEdit3, FiTrash2, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { FiPlus, FiBook, FiFileText, FiCheck, FiClock, FiDownload, FiGlobe, FiShield, FiCpu, FiAlertCircle, FiLoader, FiEdit3, FiEdit, FiRefreshCw, FiPrinter, FiTrash2, FiChevronDown, FiChevronUp } from 'react-icons/fi';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface PaperConfig {
   topic: string;
@@ -92,6 +93,12 @@ export default function ResearchPage() {
   const [verificationResults, setVerificationResults] = useState<any>(null);
   const [translationTarget, setTranslationTarget] = useState('en');
   const [isTranslating, setIsTranslating] = useState(false);
+  const [health, setHealth] = useState<{ remoteConfigured: boolean; reachable: string[] } | null>(null);
+  const [coverEditing, setCoverEditing] = useState(false);
+  const [coverDraft, setCoverDraft] = useState<any>(null);
+  const [isRegeneratingCover, setIsRegeneratingCover] = useState(false);
+  const [rewriteStyle, setRewriteStyle] = useState('academic');
+  const [rewritingSection, setRewritingSection] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -113,7 +120,15 @@ export default function ResearchPage() {
     };
     fetchSessions();
     fetchProviders();
+    fetchHealth();
   }, [router, supabase]);
+
+  const fetchHealth = async () => {
+    try {
+      const res = await fetch('/api/ai/health');
+      if (res.ok) setHealth(await res.json());
+    } catch { /* ignore */ }
+  };
 
   const fetchProviders = async () => {
     try {
@@ -242,6 +257,113 @@ export default function ResearchPage() {
     }
   };
 
+  const rewriteSection = async (sectionId: string) => {
+    if (!generatedPaper) return;
+    const section = generatedPaper.sections.find(s => s.id === sectionId);
+    if (!section?.content) return;
+    setRewritingSection(sectionId);
+    try {
+      const res = await fetch('/api/ai/rewrite-contextual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: section.content,
+          style: rewriteStyle,
+          context: { researchTopic: generatedPaper.config.topic },
+          preserveCitations: true,
+          improveStructure: true,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || data.error || 'Rewrite failed');
+      }
+      const data = await res.json();
+      const rewritten = data.data?.rewrittenContent;
+      if (!rewritten) throw new Error('Empty rewrite result');
+      setGeneratedPaper(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          sections: prev.sections.map(s =>
+            s.id === sectionId ? { ...s, content: rewritten, wordCount: rewritten.split(/\s+/).length } : s
+          ),
+        };
+      });
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setRewritingSection(null);
+    }
+  };
+
+  const exportMarkdown = () => {
+    if (!generatedPaper) return;
+    const lines: string[] = [];
+    lines.push(`# ${generatedPaper.coverPage?.title || generatedPaper.config.topic}`);
+    if (generatedPaper.coverPage?.subtitle) lines.push(`*${generatedPaper.coverPage.subtitle}*`);
+    lines.push('');
+    const authors = (generatedPaper.coverPage?.authors || []).filter(a => a.name).map(a => a.name).join(', ');
+    if (authors) lines.push(authors);
+    if (generatedPaper.coverPage?.institution) lines.push(generatedPaper.coverPage.institution);
+    lines.push('');
+    if (generatedPaper.coverPage?.keywords?.length) lines.push(`**Keywords:** ${generatedPaper.coverPage.keywords.join(', ')}`);
+    lines.push('');
+    for (const s of generatedPaper.sections) {
+      if (!s.content) continue;
+      lines.push(`## ${s.title}`);
+      lines.push('');
+      lines.push(s.content);
+      lines.push('');
+    }
+    if (generatedPaper.references.length > 0) {
+      lines.push('## References');
+      lines.push('');
+      generatedPaper.references.forEach((ref, i) => {
+        lines.push(`${i + 1}. ${ref.authors} (${ref.year}). ${ref.title}.${ref.journal ? ` *${ref.journal}*.` : ''}${ref.doi ? ` DOI: ${ref.doi}` : ''}`);
+      });
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(generatedPaper.coverPage?.title || 'research-paper').replace(/[^a-zA-Z0-9]/g, '-').substring(0, 50)}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const printPaper = () => {
+    window.print();
+  };
+
+  const regenerateCover = async () => {
+    if (!generatedPaper) return;
+    setIsRegeneratingCover(true);
+    try {
+      const abstract = generatedPaper.sections.find(s => s.id === 'abstract')?.content || '';
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          task: 'chat',
+          prompt: `Design a professional research paper cover page for the topic "${generatedPaper.config.topic}" (${generatedPaper.config.discipline}). Context — abstract excerpt: ${abstract.substring(0, 1500)}. Return ONLY valid JSON with keys: title, subtitle, authors (array of {name, affiliation, email}), institution, department, keywords (array of 4-6 strings). No commentary.`,
+        }),
+      });
+      if (!res.ok) throw new Error('Cover regeneration failed');
+      const data = await res.json();
+      const match = (data.result || '').match(/\{[\s\S]*\}/);
+      if (!match) throw new Error('Could not parse cover data');
+      const parsed = JSON.parse(match[0]);
+      const next = { ...generatedPaper.coverPage, ...parsed, date: generatedPaper.coverPage?.date || new Date().toISOString().split('T')[0] };
+      setGeneratedPaper(prev => (prev ? { ...prev, coverPage: next } : prev));
+      setCoverDraft(next);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsRegeneratingCover(false);
+    }
+  };
+
   const createNewSession = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -321,6 +443,21 @@ export default function ResearchPage() {
             <button onClick={() => setError('')} className="ml-auto text-red-500 hover:text-red-700">
               <FiTrash2 className="w-4 h-4" />
             </button>
+          </div>
+        )}
+
+        {/* AI setup hint when no cloud key is configured */}
+        {health && !health.remoteConfigured && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-3">
+            <FiAlertCircle className="w-5 h-5 text-yellow-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-800">
+              <span className="font-medium">No cloud AI key configured.</span>{' '}
+              Papers will be generated as offline local scaffolds. Add a free key to{' '}
+              <code className="px-1 bg-yellow-100 rounded">.env.local</code> (
+              <span className="font-medium">GEMINI_API_KEY</span>, MISTRAL_API_KEY, DEEPSEEK_API_KEY, or
+              OPENROUTER_API_KEY) and restart the dev server for full multi-AI generation. See{' '}
+              <code className="px-1 bg-yellow-100 rounded">docs/ADMIN_SETUP.md</code> in the repo.
+            </div>
           </div>
         )}
 
@@ -548,6 +685,20 @@ export default function ResearchPage() {
                         <FiDownload className="w-4 h-4" />
                         {isExporting ? 'Exporting...' : 'Export HTML'}
                       </button>
+                      <button
+                        onClick={exportMarkdown}
+                        className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+                      >
+                        <FiDownload className="w-4 h-4" />
+                        Markdown
+                      </button>
+                      <button
+                        onClick={printPaper}
+                        className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+                      >
+                        <FiPrinter className="w-4 h-4" />
+                        Print / PDF
+                      </button>
                     </div>
                   </div>
 
@@ -568,6 +719,24 @@ export default function ResearchPage() {
                     <div className="bg-gray-50 rounded-lg p-3 text-center">
                       <div className="text-2xl font-bold text-orange-600">{generatedPaper.config.citationStyle}</div>
                       <div className="text-xs text-gray-500">Citation Style</div>
+                    </div>
+                  </div>
+
+                  {/* Words-per-section chart */}
+                  <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Words per section</p>
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={generatedPaper.sections.filter(s => s.content).map(s => ({ name: s.title.split(' ')[0], words: s.wordCount }))}
+                          margin={{ top: 4, right: 8, left: -12, bottom: 0 }}
+                        >
+                          <XAxis dataKey="name" fontSize={11} />
+                          <YAxis fontSize={11} />
+                          <Tooltip />
+                          <Bar dataKey="words" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
 
@@ -638,10 +807,101 @@ export default function ResearchPage() {
                   </div>
                 </div>
 
-                {/* Cover Page Preview */}
+                {/* Cover Page Preview + Editor */}
                 {generatedPaper.coverPage && (
                   <div className="bg-white border border-gray-200 rounded-xl p-8 shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Cover Page</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-bold text-gray-900">Cover Page</h3>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setCoverDraft({ ...generatedPaper.coverPage }); setCoverEditing(v => !v); }}
+                          className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+                        >
+                          <FiEdit className="w-4 h-4" />
+                          {coverEditing ? 'Close Editor' : 'Edit Cover'}
+                        </button>
+                        <button
+                          onClick={regenerateCover}
+                          disabled={isRegeneratingCover}
+                          className="px-3 py-1.5 bg-purple-50 border border-purple-200 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-2 text-sm disabled:opacity-50"
+                        >
+                          <FiRefreshCw className={`w-4 h-4 ${isRegeneratingCover ? 'animate-spin' : ''}`} />
+                          {isRegeneratingCover ? 'Generating...' : 'AI Regenerate'}
+                        </button>
+                      </div>
+                    </div>
+                    {coverEditing && coverDraft && (
+                      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                          <input
+                            type="text"
+                            value={coverDraft.title || ''}
+                            onChange={e => setCoverDraft({ ...coverDraft, title: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Subtitle</label>
+                          <input
+                            type="text"
+                            value={coverDraft.subtitle || ''}
+                            onChange={e => setCoverDraft({ ...coverDraft, subtitle: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Author name</label>
+                          <input
+                            type="text"
+                            value={coverDraft.authors?.[0]?.name || ''}
+                            onChange={e => setCoverDraft({ ...coverDraft, authors: [{ ...(coverDraft.authors?.[0] || {}), name: e.target.value }] })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Affiliation</label>
+                          <input
+                            type="text"
+                            value={coverDraft.authors?.[0]?.affiliation || ''}
+                            onChange={e => setCoverDraft({ ...coverDraft, authors: [{ ...(coverDraft.authors?.[0] || {}), affiliation: e.target.value }] })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Institution</label>
+                          <input
+                            type="text"
+                            value={coverDraft.institution || ''}
+                            onChange={e => setCoverDraft({ ...coverDraft, institution: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Keywords (comma separated)</label>
+                          <input
+                            type="text"
+                            value={(coverDraft.keywords || []).join(', ')}
+                            onChange={e => setCoverDraft({ ...coverDraft, keywords: e.target.value.split(',').map((k: string) => k.trim()).filter(Boolean) })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                        <div className="md:col-span-2 flex gap-2">
+                          <button
+                            onClick={() => { setGeneratedPaper(prev => (prev ? { ...prev, coverPage: coverDraft } : prev)); setCoverEditing(false); }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                          >
+                            Save Cover
+                          </button>
+                          <button
+                            onClick={() => setCoverEditing(false)}
+                            className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <div className="text-center space-y-4 border-2 border-gray-200 rounded-lg p-8">
                       <h1 className="text-3xl font-bold text-gray-900">{generatedPaper.coverPage.title}</h1>
                       {generatedPaper.coverPage.subtitle && (
@@ -669,9 +929,12 @@ export default function ResearchPage() {
                 {/* Sections */}
                 {generatedPaper.sections.filter(s => s.content && s.title !== 'Research Plan').map(section => (
                   <div key={section.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                    <button
+                    <div
                       onClick={() => setExpandedSection(expandedSection === section.id ? null : section.id)}
-                      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setExpandedSection(expandedSection === section.id ? null : section.id); }}
+                      role="button"
+                      tabIndex={0}
+                      className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                     >
                       <div className="flex items-center gap-3">
                         <FiFileText className="w-5 h-5 text-blue-500" />
@@ -684,19 +947,43 @@ export default function ResearchPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
+                        <span
                           onClick={e => { e.stopPropagation(); translateSection(section.id); }}
-                          disabled={isTranslating}
-                          className="p-1 text-gray-400 hover:text-blue-600"
+                          onKeyDown={e => { e.stopPropagation(); }}
+                          role="button"
+                          tabIndex={0}
                           title="Translate section"
+                          className="p-1 text-gray-400 hover:text-blue-600 cursor-pointer"
                         >
                           <FiGlobe className="w-4 h-4" />
-                        </button>
+                        </span>
                         {expandedSection === section.id ? <FiChevronUp className="w-4 h-4" /> : <FiChevronDown className="w-4 h-4" />}
                       </div>
-                    </button>
+                    </div>
                     {expandedSection === section.id && (
                       <div className="px-4 pb-4 border-t border-gray-100">
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <select
+                            value={rewriteStyle}
+                            onChange={e => setRewriteStyle(e.target.value)}
+                            className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs"
+                            title="Rewrite style"
+                          >
+                            <option value="academic">Academic</option>
+                            <option value="formal">Formal</option>
+                            <option value="simple">Simple</option>
+                            <option value="technical">Technical</option>
+                            <option value="concise">Concise</option>
+                          </select>
+                          <button
+                            onClick={() => rewriteSection(section.id)}
+                            disabled={rewritingSection === section.id}
+                            className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700 disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <FiEdit3 className="w-3 h-3" />
+                            {rewritingSection === section.id ? 'Rewriting...' : 'AI Rewrite'}
+                          </button>
+                        </div>
                         <div className="mt-4 prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap leading-relaxed">
                           {section.content}
                         </div>

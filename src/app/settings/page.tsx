@@ -258,8 +258,12 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">AI Provider</label>
                     <select value={aiProvider} onChange={(e) => setAiProvider(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                      <option value="gemini">Google Gemini</option>
-                      <option value="openai">OpenAI</option>
+                      <option value="gemini">Google Gemini (free)</option>
+                      <option value="google-ai-studio">Google AI Studio (free)</option>
+                      <option value="mistral">Mistral (free tier)</option>
+                      <option value="deepseek">DeepSeek (free tier)</option>
+                      <option value="openrouter">OpenRouter (free models)</option>
+                      <option value="local">Local offline draft</option>
                     </select>
                   </div>
 
@@ -267,10 +271,10 @@ export default function SettingsPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">AI Model</label>
                     <select value={aiModel} onChange={(e) => setAiModel(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                      <option value="gemini-pro">Gemini Pro</option>
-                      <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                      <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                      <option value="gpt-4">GPT-4</option>
+                      <option value="gemini-2.0-flash">Gemini 2.0 Flash (free)</option>
+                      <option value="mistral-small-latest">Mistral Small (free tier)</option>
+                      <option value="deepseek-chat">DeepSeek Chat (free tier)</option>
+                      <option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B via OpenRouter (free)</option>
                     </select>
                   </div>
 
