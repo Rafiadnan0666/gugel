@@ -32,6 +32,8 @@ export interface GenerateResult {
   provider: ProviderId;
   model: string;
   usage: { inputTokens: number; outputTokens: number; cost: number };
+  /** When the offline local provider won, WHY the cloud providers failed. */
+  fallbackErrors?: string[];
 }
 
 export interface ProviderStatus {
@@ -77,10 +79,15 @@ export const FREE_MODELS = {
 } as const;
 
 // Free OpenRouter fallbacks tried in order when the primary fails.
+// Spread across different upstream pools (Google, Liquid, NVIDIA, Cohere,
+// Thinking Machines) so one busy shared pool doesn't block generation.
 const OPENROUTER_FALLBACK_MODELS = [
   process.env.OPENROUTER_MODEL_LLAMA || 'google/gemma-4-26b-a4b-it:free',
   process.env.OPENROUTER_MODEL_MISTRAL || 'google/gemma-4-31b-it:free',
   process.env.OPENROUTER_MODEL_GEMMA || 'liquid/lfm-2.5-2.6b:free',
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free',
+  'cohere/north-mini-code:free',
+  'thinkingmachines/inkling-small:free',
 ];
 
 // Rate limiter per provider
@@ -171,18 +178,18 @@ function buildLocalDraft(prompt: string, opts?: GenerateOpts): string {
   const topic = extractTopic(prompt);
   const maxWords = Math.max(120, Math.min(1200, Math.floor((opts?.maxTokens || 1500) / 2)));
   return [
-    `[Local offline draft — ${kind}. Connect a free cloud provider (Gemini, Mistral, DeepSeek, or OpenRouter) to generate full AI content.]`,
+    `[Local offline draft — ${kind}. Both cloud providers are temporarily unreachable (throttled or out of quota). Check live status on the /test-ai page, wait a minute, then regenerate for full AI content.]`,
     '',
     `Topic: ${topic}`,
     '',
-    `This is a structured scaffold for the ${kind} section on "${topic}", produced offline without any API key so your workflow is never blocked.`,
+    `This is a structured scaffold for the ${kind} section on "${topic}", produced offline without any API call so your workflow is never blocked.`,
     '',
     '1. Background: state the problem, why it matters, and the scope of this study.',
     '2. Evidence: consult peer-reviewed sources (CrossRef, OpenAlex, Semantic Scholar, PubMed, ScienceDirect) and cite them properly — every factual claim needs a verifiable reference with a DOI.',
     '3. Method: describe the research design, data collection, sampling, analysis procedure, validity measures, and ethics approval.',
     '4. Results: report findings objectively with tables/figures, effect sizes, and significance levels before interpreting them.',
     '5. Discussion: interpret results against the literature, acknowledge limitations, and state theoretical and practical implications.',
-    `6. Next step: replace this scaffold by running generation again once a provider key is configured, then run reference verification to confirm every citation exists.`,
+    `6. Next step: retry generation shortly (the app automatically uses Mistral or OpenRouter when reachable), then run reference verification to confirm every citation exists.`,
     '',
     `(Scaffold length budget: ~${maxWords} words. No references were fabricated in this draft.)`,
   ].join('\n');
@@ -417,11 +424,13 @@ class MultiProviderAIService {
   ): Promise<GenerateResult> {
     await this.ensureProviders();
     if (this.providers.length === 0) {
-      throw new Error('No AI providers configured. Add a free API key (Gemini, Mistral, DeepSeek, or OpenRouter) in .env.local');
+      throw new Error('No AI providers configured. Add a free API key (Mistral or OpenRouter) in .env.local');
     }
 
     const cleanPrompt = (prompt || '').trim();
     if (!cleanPrompt) throw new Error('Prompt is empty');
+
+    const remoteErrors: string[] = [];
 
     // If preferred provider specified and available, use it first
     if (opts.preferredProvider) {
@@ -430,27 +439,35 @@ class MultiProviderAIService {
         try {
           const result = await this.tryProvider(preferred.provider, cleanPrompt, opts);
           return result;
-        } catch { /* fall through to cascade */ }
+        } catch (e: any) {
+          remoteErrors.push(`${preferred.provider.id}: ${e.message}`);
+          /* fall through to cascade */
+        }
       }
     }
 
     // Cascade through providers (remote first, local last)
-    const errors: string[] = [];
     for (const entry of this.providerMap.values()) {
       if (entry.provider.id !== 'local' && !checkRateLimit(entry.provider.id)) continue;
       // Skip already-preferred (already tried)
       if (opts.preferredProvider && entry.provider.id === opts.preferredProvider) continue;
       try {
         const result = await this.tryProvider(entry.provider, cleanPrompt, opts);
+        // Offline fallback won: attach WHY the clouds failed so the UI can
+        // tell the user (throttled? quota? key?) instead of silent scaffold.
+        if (result.provider === 'local' && remoteErrors.length > 0) {
+          return { ...result, fallbackErrors: [...remoteErrors] };
+        }
         return result;
       } catch (e: any) {
-        errors.push(`${entry.provider.id}: ${e.message}`);
+        const msg = `${entry.provider.id}: ${e.message}`;
+        remoteErrors.push(msg);
         entry.errorCount++;
         entry.lastError = e.message;
       }
     }
 
-    throw new Error(`All AI providers failed:\n${errors.join('\n')}`);
+    throw new Error(`All AI providers failed:\n${remoteErrors.join('\n')}`);
   }
 
   private async tryProvider(provider: AIProvider, prompt: string, opts: GenerateOpts): Promise<GenerateResult> {

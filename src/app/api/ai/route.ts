@@ -8,6 +8,24 @@ import { checkRateLimit, RATE_LIMITS, createRateLimitResponse, sanitizeInput } f
 
 const webScraper = new WebScraper();
 
+// Attach which provider answered (and, for offline drafts, WHY the clouds
+// failed) so every UI can show it instead of a silent scaffold.
+function providerInfo(aiResult: {
+  provider: string;
+  model: string;
+  fallbackErrors?: string[];
+}): Record<string, unknown> {
+  if (aiResult.provider === 'local') {
+    return {
+      provider: aiResult.provider,
+      model: aiResult.model,
+      note: 'Offline draft — cloud providers temporarily unreachable. Wait a minute and retry.',
+      reasons: aiResult.fallbackErrors || [],
+    };
+  }
+  return { provider: aiResult.provider, model: aiResult.model };
+}
+
 export async function POST(request: Request) {
   let body: any;
   try {
@@ -77,6 +95,7 @@ export async function POST(request: Request) {
         summary: scrapingReport.summary,
         url: scrapingReport.content.url,
         usage: aiResult.usage,
+        ...providerInfo(aiResult),
       });
 
     } else if (task === 'analyze-url') {
@@ -104,6 +123,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         result: aiResult.text,
         usage: aiResult.usage,
+        ...providerInfo(aiResult),
       });
 
     } else if (task === 'enhance-content') {
@@ -115,6 +135,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         result: aiResult.text,
         usage: aiResult.usage,
+        ...providerInfo(aiResult),
       });
 
     } else {
@@ -127,6 +148,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         result: aiResult.text,
         usage: aiResult.usage,
+        ...providerInfo(aiResult),
       });
     }
 

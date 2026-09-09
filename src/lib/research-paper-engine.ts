@@ -132,6 +132,8 @@ export class ResearchPaperEngine {
       section.content = result.output.trim();
       section.wordCount = this.countWords(result.output);
       section.status = 'completed';
+      (section as PaperSection & { aiProvider?: string }).aiProvider =
+        result.providerUsed === 'local' ? 'Local draft' : (result.providerUsed || 'AI');
       this.reportProgress(sectionId, 100, 'completed');
     } else {
       section.status = 'failed';
@@ -276,6 +278,7 @@ export class ResearchPaperEngine {
         title: 'Research Results Visualization',
         caption: output.substring(0, 300),
         generatedBy: 'ai',
+        aiProvider: figResult.providerUsed === 'local' ? 'Local draft' : (figResult.providerUsed || 'ai'),
         metadata: {
           chartType: /bar/i.test(output) ? 'Bar Chart' : /line/i.test(output) ? 'Line Chart' : /scatter/i.test(output) ? 'Scatter Plot' : /pie/i.test(output) ? 'Pie Chart' : 'Other',
           statisticalTests: /p-value|confidence|effect size|significant/i.test(output) ? 'Included' : 'Not specified',
@@ -333,6 +336,7 @@ export class ResearchPaperEngine {
         title: 'Research Simulation Results',
         caption: output.substring(0, 300),
         generatedBy: 'ai',
+        aiProvider: simResult.providerUsed === 'local' ? 'Local draft' : (simResult.providerUsed || 'ai'),
         metadata: {
           simulationType: /monte carlo/i.test(output) ? 'Monte Carlo' : /agent-based/i.test(output) ? 'Agent-based' : 'Other',
           parameters: /parameter/i.test(output) ? 'Included' : 'Not specified',

@@ -26,28 +26,38 @@ export async function mistralGenerate(
   const maxTokens = options.maxTokens || 4096;
   const temperature = options.temperature ?? 0.7;
 
-  let res: Response;
-  try {
-    res = await fetch(`${MISTRAL_BASE}/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
-      signal: AbortSignal.timeout(25000),
-    });
-  } catch (e: any) {
-    throw new Error(`Mistral network error: ${e.message}.`);
-  }
+  let res: Response | null = null;
+  let lastErr = '';
+  // Single retry on 429: trial accounts are often per-minute throttled.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      res = await fetch(`${MISTRAL_BASE}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.apiKey}`,
+        },
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature }),
+        signal: AbortSignal.timeout(25000),
+      });
+    } catch (e: any) {
+      throw new Error(`Mistral network error: ${e.message}.`);
+    }
 
-  if (!res.ok) {
-    const err = await res.text();
+    if (res.ok) break;
+
+    lastErr = await res.text();
     if (res.status === 401) throw new Error('Mistral auth error (401): invalid API key. Get a free key at https://console.mistral.ai/');
-    if (res.status === 429) throw new Error('Mistral rate limit exceeded. Try another provider.');
-    throw new Error(`Mistral API error (${res.status}): ${err}`);
+    if (res.status === 429 && attempt === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      res = null;
+      continue;
+    }
+    if (res.status === 429) throw new Error('Mistral rate limit exceeded (trial quota may be spent — check https://console.mistral.ai/). Try another provider.');
+    throw new Error(`Mistral API error (${res.status}): ${lastErr}`);
   }
 
+  if (!res) throw new Error('Mistral request failed unexpectedly.');
   const data: MistralResponse = await res.json();
   const text = data.choices[0]?.message?.content || '';
   return { text, usage: { inputTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens } };

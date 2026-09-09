@@ -46,6 +46,12 @@ import { exportToPDF } from '@/lib/pdf';
 // Enhanced AI Service using server-side API with credit checking
 const useAIService = () => {
   const [aiStatus, setAiStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
+  const [lastProvider, setLastProvider] = useState<{
+    provider: string;
+    model?: string;
+    note?: string;
+    reasons?: string[];
+  } | null>(null);
 
   useEffect(() => {
     // Check if AI is available via the API
@@ -81,6 +87,12 @@ const useAIService = () => {
       }
 
       const data = await response.json();
+      setLastProvider({
+        provider: data.provider || 'unknown',
+        model: data.model,
+        note: data.note,
+        reasons: data.reasons,
+      });
       return data.result || 'No response from AI';
     } catch (error) {
       console.error('AI call failed:', error);
@@ -164,6 +176,7 @@ const useAIService = () => {
 
   return {
     aiStatus,
+    lastProvider,
     generateSummary,
     translateContent,
     rewriteContent,
@@ -1410,6 +1423,7 @@ export default function AdvancedSessionPage() {
 
   const { 
     aiStatus,
+    lastProvider,
     generateSummary, 
     translateContent, 
     rewriteContent, 
@@ -2374,7 +2388,20 @@ export default function AdvancedSessionPage() {
                 </div>
               </div>
             </div>
-            
+
+            {lastProvider?.provider === 'local' && (
+              <div className="mx-6 mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
+                <span className="font-medium">Last answer was an offline draft</span> — {lastProvider.note || 'cloud providers temporarily unreachable.'}
+                {lastProvider.reasons && lastProvider.reasons.length > 0 && (
+                  <ul className="mt-1 list-disc list-inside text-yellow-700">
+                    {lastProvider.reasons.slice(0, 3).map((r, i) => (
+                      <li key={i}>{r.length > 160 ? `${r.substring(0, 160)}…` : r}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
             <AIChat
               messages={chatMessages}
               onSendMessage={sendChatMessage}
