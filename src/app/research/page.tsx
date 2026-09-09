@@ -69,6 +69,23 @@ const LANGUAGES = [
 
 const CITATION_STYLES = ['APA', 'MLA', 'IEEE', 'Chicago', 'Harvard', 'Vancouver'] as const;
 
+// Read a JSON API response safely: serverless timeouts / proxies sometimes
+// return HTML or plain text, and res.json() then throws a confusing
+// "Unexpected token ..." error that hides the real cause.
+async function readJsonSafe(res: Response): Promise<any> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    const snippet = text.replace(/\s+/g, ' ').trim().substring(0, 220);
+    throw new Error(
+      snippet
+        ? `Request failed (${res.status}): ${snippet}`
+        : `Request failed with status ${res.status}. The generation may have timed out — try again with fewer pages.`
+    );
+  }
+}
+
 export default function ResearchPage() {
   const router = useRouter();
   const supabase = createClient();
@@ -163,11 +180,11 @@ export default function ResearchPage() {
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = await readJsonSafe(res);
         throw new Error(data.error || data.errors?.join(', ') || 'Generation failed');
       }
 
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       setGeneratedPaper(data.paper);
       setActiveTab('history');
     } catch (err: any) {
@@ -217,7 +234,7 @@ export default function ResearchPage() {
 
       if (!res.ok) throw new Error('Verification failed');
 
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       setVerificationResults(data);
     } catch (err: any) {
       setError(err.message);
@@ -246,7 +263,7 @@ export default function ResearchPage() {
 
       if (!res.ok) throw new Error('Translation failed');
 
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       setGeneratedPaper(prev => {
         if (!prev) return prev;
         return {
@@ -281,10 +298,10 @@ export default function ResearchPage() {
         }),
       });
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+        const data = await readJsonSafe(res).catch(() => ({}));
         throw new Error(data.message || data.error || 'Rewrite failed');
       }
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       const rewritten = data.data?.rewrittenContent;
       if (!rewritten) throw new Error('Empty rewrite result');
       setGeneratedPaper(prev => {
@@ -356,7 +373,7 @@ export default function ResearchPage() {
         }),
       });
       if (!res.ok) throw new Error('Cover regeneration failed');
-      const data = await res.json();
+      const data = await readJsonSafe(res);
       const match = (data.result || '').match(/\{[\s\S]*\}/);
       if (!match) throw new Error('Could not parse cover data');
       const parsed = JSON.parse(match[0]);
@@ -780,7 +797,7 @@ export default function ResearchPage() {
                             }),
                           });
                           if (!res.ok) throw new Error('Translation failed');
-                          const data = await res.json();
+                          const data = await readJsonSafe(res);
                           setGeneratedPaper(prev => {
                             if (!prev) return prev;
                             return {

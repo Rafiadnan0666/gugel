@@ -5,6 +5,10 @@ import { ResearchPaperEngine, type PaperConfig } from '@/lib/research-paper-engi
 import { createAgenticEngine } from '@/lib/agentic-engine';
 import { validatePaperConfig, sanitizeInput, checkRateLimit, RATE_LIMITS, createRateLimitResponse } from '@/lib/rate-limiter';
 
+// Full-paper generation fans out to parallel AI calls; allow the platform
+// maximum so slow free-tier pools don't get cut off mid-paper.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   // Auth first so rate limiting is per-user (global keys block all users).
   const cookieStore = await cookies();

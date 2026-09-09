@@ -61,35 +61,43 @@ export class ResearchPaperEngine {
 
   async generatePaper() {
     if (!this.paper) return;
-    this.reportProgress('planning', 5, 'running');
+    this.reportProgress('init', 3, 'running');
 
-    // 1. Research plan (best-effort; paper still generates if it fails)
-    await this.runTask('research-planning', 'Create research plan', {
-      topic: this.paper.config.topic,
-      context: `Plan a rigorous study on "${this.paper.config.topic}" (${this.paper.config.discipline}). ${this.paper.config.customInstructions || ''}`,
-    });
-
-    // 2. Generate the 7 core sections sequentially (cost-controlled: 7 calls)
+    // Sections are independent (topic + discipline only) — generate with
+    // bounded parallelism (3 at a time) so wall-clock time fits inside
+    // serverless limits. Sequential generation with retries timed out.
     const total = SECTION_TASKS.length;
-    for (let i = 0; i < SECTION_TASKS.length; i++) {
-      const { sectionId, taskType } = SECTION_TASKS[i];
-      this.reportProgress(sectionId, Math.round(((i + 1) / (total + 3)) * 100), 'running');
+    let done = 0;
+    const inFlight = new Set<Promise<void>>();
+    const runOne = async (sectionId: string, taskType: TaskType) => {
+      this.reportProgress(sectionId, Math.round((done / (total + 3)) * 100), 'running');
       await this.generateSection(sectionId, taskType);
+      done++;
+      this.reportProgress(sectionId, Math.round((done / (total + 3)) * 100), done >= total ? 'sections-done' : 'running');
+    };
+    for (const { sectionId, taskType } of SECTION_TASKS) {
+      const p = runOne(sectionId, taskType);
+      inFlight.add(p);
+      void p.finally(() => inFlight.delete(p));
+      if (inFlight.size >= 3) await Promise.race(inFlight);
     }
+    await Promise.allSettled(inFlight);
 
     // 3. References: live trusted databases first, AI-assisted top-up, curated fallback
     this.reportProgress('references', 80, 'running');
     this.paper.references = await this.buildReferences();
 
-    // 4. Figures / tables / simulations
+    // 4. Figures / tables / simulations (independent — run together)
+    const extras: Promise<void>[] = [];
     if (this.paper.config.includeGraphs) {
       this.reportProgress('figures', 88, 'running');
-      await this.generateFigures(this.paper.config);
+      extras.push(this.generateFigures(this.paper.config));
     }
     if (this.paper.config.includeSimulations) {
       this.reportProgress('simulation', 93, 'running');
-      await this.generateSimulation(this.paper.config);
+      extras.push(this.generateSimulation(this.paper.config));
     }
+    await Promise.allSettled(extras);
 
     // 5. Evidence verification report — the "proof" for every citation
     this.reportProgress('verification', 97, 'running');
@@ -163,9 +171,11 @@ export class ResearchPaperEngine {
           context: `List 8 real, peer-reviewed publications relevant to "${topic}". For each give: authors, year, exact title, journal/venue, and DOI when known. Only include works you are confident exist. Format one per line.`,
         });
         if (lit.status === 'completed' && lit.output?.trim()) {
-          const candidates = this.parseReferences(lit.output);
+          const candidates = this.parseReferences(lit.output).slice(0, 4);
           const verifier = new EvidenceVerifier();
-          for (const c of candidates.slice(0, 6)) {
+          // Verify in parallel — sequential database checks were the
+          // slowest part of generation.
+          const verified = await Promise.all(candidates.map(async (c) => {
             try {
               const title = typeof c.title === 'string' ? c.title : '';
               const authors = typeof c.authors === 'string' ? c.authors : '';
@@ -173,9 +183,10 @@ export class ResearchPaperEngine {
               c.verified = v.verified;
               c.credibilityScore = v.confidenceScore;
               c.source = v.sources.find(s => s.found)?.database || 'ai-generated';
-              refs.push(c);
-            } catch { refs.push(c); }
-          }
+            } catch { /* keep candidate unverified */ }
+            return c;
+          }));
+          refs.push(...verified);
         }
       } catch { /* AI top-up best-effort */ }
     }
@@ -262,12 +273,19 @@ export class ResearchPaperEngine {
     const methodsSection = this.paper.sections.find(s => s.id === 'methodology') || this.paper.sections[3];
     if (!resultsSection || !methodsSection) return;
 
-    // Results figure with academic standards
-    const figResult = await this.runTask('figure-generation', 'Create data visualization', {
-      topic: config.topic,
-      existingContent: resultsSection.content || '',
-      context: `Generate a professional academic figure for research results on "${config.topic}". Include: clear title and axis labels, appropriate chart type, data points with error bars where applicable, statistical significance indicators (p-values, confidence intervals, effect sizes), academic caption with methodology and statistical tests, data source attribution. Return ONLY the figure description in markdown with caption and data details.`,
-    });
+    // Results figure + methodology table are independent — run together.
+    const [figResult, tableResult] = await Promise.all([
+      this.runTask('figure-generation', 'Create data visualization', {
+        topic: config.topic,
+        existingContent: resultsSection.content || '',
+        context: `Generate a professional academic figure for research results on "${config.topic}". Include: clear title and axis labels, appropriate chart type, data points with error bars where applicable, statistical significance indicators (p-values, confidence intervals, effect sizes), academic caption with methodology and statistical tests, data source attribution. Return ONLY the figure description in markdown with caption and data details.`,
+      }),
+      this.runTask('table-generation', 'Create methodology table', {
+        topic: config.topic,
+        existingContent: methodsSection.content || '',
+        context: `Generate a professional academic methodology table for research on "${config.topic}". Include headers and rows covering design, data collection, analysis, validity measures. Return ONLY the table in markdown with headers, rows, and a caption.`,
+      }),
+    ]);
 
     if (figResult.status === 'completed' && figResult.output?.trim()) {
       const output = figResult.output;
@@ -290,12 +308,6 @@ export class ResearchPaperEngine {
     }
 
     // Methodology table
-    const tableResult = await this.runTask('table-generation', 'Create methodology table', {
-      topic: config.topic,
-      existingContent: methodsSection.content || '',
-      context: `Generate a professional academic methodology table for research on "${config.topic}". Include headers and rows covering design, data collection, analysis, validity measures. Return ONLY the table in markdown with headers, rows, and a caption.`,
-    });
-
     if (tableResult.status === 'completed' && tableResult.output?.trim()) {
       methodsSection.tables = methodsSection.tables || [];
       methodsSection.tables.push({
