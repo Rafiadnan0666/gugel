@@ -52,19 +52,22 @@ interface ProviderEntry {
 }
 
 // Free-tier default models (all zero-cost). Overridable via env.
+// NOTE (verified Sep 2026): Gemini 2.x/2.5 models are retired for new keys —
+// Google's replacement is gemini-3.5-flash-lite. Old OpenRouter :free slugs
+// (llama-3.1-8b, mistral-7b, gemma-2-9b) are retired; gemma-4 :free works.
 export const FREE_MODELS = {
-  gemini: process.env.GEMINI_MODEL_FLASH || 'gemini-2.0-flash',
-  googleAiStudio: process.env.GEMINI_MODEL_FLASH || 'gemini-2.0-flash',
+  gemini: process.env.GEMINI_MODEL_FLASH || 'gemini-3.5-flash-lite',
+  googleAiStudio: process.env.GEMINI_MODEL_FLASH || 'gemini-3.5-flash-lite',
   mistral: process.env.MISTRAL_MODEL_SMALL || 'mistral-small-latest',
   deepseek: process.env.DEEPSEEK_MODEL_CHAT || 'deepseek-chat',
-  openrouter: process.env.OPENROUTER_MODEL_LLAMA || 'meta-llama/llama-3.1-8b-instruct:free',
+  openrouter: process.env.OPENROUTER_MODEL_LLAMA || 'google/gemma-4-26b-a4b-it:free',
 } as const;
 
 // Free OpenRouter fallbacks tried in order when the primary fails.
 const OPENROUTER_FALLBACK_MODELS = [
-  process.env.OPENROUTER_MODEL_LLAMA || 'meta-llama/llama-3.1-8b-instruct:free',
-  process.env.OPENROUTER_MODEL_MISTRAL || 'mistralai/mistral-7b-instruct:free',
-  process.env.OPENROUTER_MODEL_GEMMA || 'google/gemma-2-9b-it:free',
+  process.env.OPENROUTER_MODEL_LLAMA || 'google/gemma-4-26b-a4b-it:free',
+  process.env.OPENROUTER_MODEL_MISTRAL || 'google/gemma-4-31b-it:free',
+  process.env.OPENROUTER_MODEL_GEMMA || 'liquid/lfm-2.5-2.6b:free',
 ];
 
 // Rate limiter per provider
@@ -92,15 +95,6 @@ function looksLikePlaceholder(key: string | undefined): boolean {
   if (!key) return true;
   const v = key.trim();
   return v.length < 8 || /your_.*_here|changeme|example|placeholder/i.test(v);
-}
-
-function geminiKeyHint(key: string): string | undefined {
-  // Real Google AI Studio keys start with "AIza". Anything else is almost
-  // certainly wrong (e.g. an OAuth token pasted by mistake).
-  if (key && !key.startsWith('AIza')) {
-    return 'Key does not look like a Google AI Studio key (expected to start with "AIza"). Get a free key at https://aistudio.google.com/apikey';
-  }
-  return undefined;
 }
 
 /**
@@ -184,10 +178,11 @@ function buildLocalDraft(prompt: string, opts?: GenerateOpts): string {
 function createProviders(): AIProvider[] {
   const providers: AIProvider[] = [];
 
-  // Gemini (Google AI Studio direct) — free tier
+  // Gemini (Google AI Studio direct) — free tier.
+  // NOTE: keys come in several valid formats ("AIza..." and others) — never
+  // gate on prefix; a live ping decides availability.
   const geminiKey = (process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_API_KEY || '').trim();
   if (!looksLikePlaceholder(geminiKey)) {
-    const hint = geminiKeyHint(geminiKey);
     providers.push({
       id: 'gemini',
       name: 'Google Gemini',
@@ -195,7 +190,6 @@ function createProviders(): AIProvider[] {
       freeTier: true,
       costPer1k: { input: 0, output: 0 },
       generate: async (prompt, opts) => {
-        if (hint) throw new Error(`Gemini misconfigured: ${hint}`);
         const model = opts?.model || FREE_MODELS.gemini;
         const fullPrompt = opts?.systemPrompt ? `${opts.systemPrompt}\n\n${prompt}` : prompt;
         const result = await googleAIGenerate(
@@ -206,10 +200,7 @@ function createProviders(): AIProvider[] {
         if (!result.text?.trim()) throw new Error('Gemini returned empty response');
         return { text: result.text, provider: 'gemini', model, usage: { ...result.usage, cost: 0 } };
       },
-      isAvailable: async () => {
-        if (hint) return false;
-        return googleAIIsAvailable(geminiKey);
-      },
+      isAvailable: async () => googleAIIsAvailable(geminiKey),
       estimateTokens: (t) => Math.ceil(t.length / 4),
     });
   }
@@ -217,7 +208,6 @@ function createProviders(): AIProvider[] {
   // Google AI Studio (explicit separate key)
   const googleKey = (process.env.GOOGLE_AI_STUDIO_API_KEY || '').trim();
   if (!looksLikePlaceholder(googleKey) && googleKey !== geminiKey) {
-    const hint = geminiKeyHint(googleKey);
     providers.push({
       id: 'google-ai-studio',
       name: 'Google AI Studio',
@@ -225,7 +215,6 @@ function createProviders(): AIProvider[] {
       freeTier: true,
       costPer1k: { input: 0, output: 0 },
       generate: async (prompt, opts) => {
-        if (hint) throw new Error(`Google AI Studio misconfigured: ${hint}`);
         const model = opts?.model || FREE_MODELS.googleAiStudio;
         const fullPrompt = opts?.systemPrompt ? `${opts.systemPrompt}\n\n${prompt}` : prompt;
         const result = await googleAIGenerate(
@@ -236,10 +225,7 @@ function createProviders(): AIProvider[] {
         if (!result.text?.trim()) throw new Error('Google AI Studio returned empty response');
         return { text: result.text, provider: 'google-ai-studio', model, usage: { ...result.usage, cost: 0 } };
       },
-      isAvailable: async () => {
-        if (hint) return false;
-        return googleAIIsAvailable(googleKey);
-      },
+      isAvailable: async () => googleAIIsAvailable(googleKey),
       estimateTokens: (t) => Math.ceil(t.length / 4),
     });
   }

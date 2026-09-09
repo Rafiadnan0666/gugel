@@ -20,9 +20,8 @@ interface PaperConfig {
 }
 
 interface GeneratedPaper {
-  id: string;
-  config: PaperConfig;
-  coverPage: {
+  id?: string;
+  config: PaperConfig;  coverPage: {
     title: string;
     subtitle: string;
     authors: { name: string; affiliation: string; email: string }[];
@@ -34,9 +33,15 @@ interface GeneratedPaper {
   };
   sections: { id: string; title: string; content: string; wordCount: number; status: string; aiProvider?: string; figures?: any[]; tables?: any[] }[];
   references: { id: string; authors: string; title: string; year: number; journal?: string; doi?: string; verified: boolean; credibilityScore: number; source: string }[];
-  totalWordCount: number;
-  status: string;
-  exportedFormats: string[];
+  totalWordCount?: number;
+  status?: string;
+  exportedFormats?: string[];
+}
+
+// The generate API may omit totals — always derive them safely.
+function paperWordCount(paper: GeneratedPaper): number {
+  if (typeof paper.totalWordCount === 'number') return paper.totalWordCount;
+  return (paper.sections || []).reduce((sum, s) => sum + (s.wordCount || 0), 0);
 }
 
 interface ProgressUpdate {
@@ -705,7 +710,7 @@ export default function ResearchPage() {
                   {/* Paper Stats */}
                   <div className="grid grid-cols-4 gap-4 mt-4">
                     <div className="bg-gray-50 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-blue-600">{generatedPaper.totalWordCount.toLocaleString()}</div>
+                      <div className="text-2xl font-bold text-blue-600">{paperWordCount(generatedPaper).toLocaleString()}</div>
                       <div className="text-xs text-gray-500">Words</div>
                     </div>
                     <div className="bg-gray-50 rounded-lg p-3 text-center">

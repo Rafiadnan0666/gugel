@@ -20,7 +20,7 @@ export async function googleAIGenerate(
   prompt: string,
   options: { model?: string; maxTokens?: number; temperature?: number } = {}
 ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
-  const model = options.model || 'gemini-2.0-flash';
+  const model = options.model || 'gemini-3.5-flash-lite';
   const maxTokens = options.maxTokens || 4096;
   const temperature = options.temperature ?? 0.7;
 
@@ -44,8 +44,8 @@ export async function googleAIGenerate(
 
   if (!res.ok) {
     const err = await res.text();
-    if (res.status === 400) throw new Error(`Google AI Studio error (400): ${err}. Common causes: invalid key (must start with "AIza", get one free at https://aistudio.google.com/apikey) or unknown model "${model}".`);
-    if (res.status === 403 || res.status === 401) throw new Error(`Google AI Studio auth error (${res.status}): invalid or restricted key.`);
+    if (res.status === 400) throw new Error(`Google AI Studio error (400): ${err}. Common causes: invalid key (get a free one at https://aistudio.google.com/apikey) or unknown model "${model}".`);
+    if (res.status === 403 || res.status === 401) throw new Error(`Google AI Studio auth error (${res.status}): invalid/restricted key or project denied access. Enable the Generative Language API, or grab a fresh free key at https://aistudio.google.com/apikey`);
     if (res.status === 429) throw new Error('Google AI Studio quota exceeded (free tier limit). Try another provider.');
     throw new Error(`Google AI Studio error (${res.status}): ${err}`);
   }

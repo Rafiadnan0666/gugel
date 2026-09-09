@@ -21,7 +21,7 @@ export async function openRouterGenerate(
   messages: OpenRouterMessage[],
   options: { model?: string; maxTokens?: number; temperature?: number } = {}
 ): Promise<{ text: string; usage: { inputTokens: number; outputTokens: number } }> {
-  const model = options.model || 'meta-llama/llama-3.1-8b-instruct:free';
+  const model = options.model || 'google/gemma-4-26b-a4b-it:free';
   const maxTokens = options.maxTokens || 4096;
   const temperature = options.temperature ?? 0.7;
 

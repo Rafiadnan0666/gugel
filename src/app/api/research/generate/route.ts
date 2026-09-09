@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      paper,
+      paper: { ...paper, totalWordCount, id: `paper-${Date.now()}` },
       stats: {
         totalTokens: stats.totalTokens,
         completedTasks: stats.completedTasks,
